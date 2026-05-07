@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardDescription,
@@ -40,12 +41,18 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
   return (
     <AppShell title="Employee Profile">
       <div className="space-y-6">
-        <Link
-          href="/employees"
-          className="text-sm font-medium text-slate-600 hover:text-slate-950"
-        >
-          ← Back to Employees
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href="/employees"
+            className="text-sm font-medium text-slate-600 hover:text-slate-950"
+          >
+            ← Back to Employees
+          </Link>
+
+          <Link href={`/employees/${employee.id}/edit`}>
+            <Button type="button">Edit Employee</Button>
+          </Link>
+        </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -53,9 +60,11 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
               <p className="text-sm font-medium text-slate-500">
                 {employee.staff_no || "No staff number"}
               </p>
+
               <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
                 {employee.full_name}
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 {employee.designation || employee.position || "No designation"}
               </p>
@@ -125,7 +134,11 @@ type ProfileSectionProps = {
   items: [string, unknown][];
 };
 
-function ProfileSection({ title, description, items }: ProfileSectionProps) {
+function ProfileSection({
+  title,
+  description,
+  items,
+}: ProfileSectionProps) {
   return (
     <Card>
       <CardHeader>
@@ -142,6 +155,7 @@ function ProfileSection({ title, description, items }: ProfileSectionProps) {
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               {label}
             </dt>
+
             <dd className="mt-1 text-sm font-medium text-slate-950">
               {String(value || "-")}
             </dd>
