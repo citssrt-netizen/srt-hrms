@@ -109,42 +109,29 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
         <EmployeeProfilePhoto
           employeeId={employee.id}
           employeeName={employee.full_name}
+          staffNo={employee.staff_no}
+          designation={employee.designation || employee.position}
           currentPhotoUrl={profilePhotoUrl}
         />
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
-            <div>
-              <p className="text-sm font-medium text-slate-500">
-                {employee.staff_no || "No staff number"}
-              </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
+              employee.employment_status
+            )}`}
+          >
+            {employee.employment_status || "Active"}
+          </span>
 
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-                {employee.full_name}
-              </h2>
+          <span className="text-sm text-slate-500">
+            Joined {formatDate(employee.joined_date)}
+          </span>
+        </div>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {employee.designation || employee.position || "No designation"}
-              </p>
-            </div>
-
-            <span
-              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
-                employee.employment_status
-              )}`}
-            >
-              {employee.employment_status || "Active"}
-            </span>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <SummaryCard label="Department" value={employee.department} />
-            <SummaryCard label="Branch" value={employee.branch} />
-            <SummaryCard
-              label="Joined Date"
-              value={formatDate(employee.joined_date)}
-            />
-          </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <SummaryCard label="Department" value={employee.department} />
+          <SummaryCard label="Branch" value={employee.branch} />
+          <SummaryCard label="Business Unit" value={employee.business_unit} />
         </div>
 
         <EmployeeStatusActions
@@ -152,56 +139,54 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
           currentStatus={employee.employment_status}
         />
 
-        <EmployeeDocuments employeeId={employee.id} />
-
         <ProfileSection
-          title="General Information"
-          description="Identity and personal details."
+          title="Employee Details"
+          description="Core identity and employment information."
           items={[
             ["Staff No", employee.staff_no],
-            ["Employment Type", employee.employment_type],
             ["Full Name", employee.full_name],
-            ["Date of Birth", formatDate(employee.date_of_birth)],
-            ["Gender", employee.gender],
-            ["Marital Status", employee.marital_status],
             ["IC No", employee.ic_number],
-            ["Race", employee.race],
-            ["Religion", employee.religion],
-            ["Nationality", employee.nationality],
+            ["Employment Type", employee.employment_type],
+            ["Staff Type", employee.staff_type],
+            ["Designation", employee.designation],
+            ["Department", employee.department],
+            ["Division", employee.division],
+            ["Branch", employee.branch],
+            ["Employment Status", employee.employment_status],
+            ["Joined Date", formatDate(employee.joined_date)],
           ]}
         />
 
         <ProfileSection
-          title="Contact Information"
-          description="Address, phone, email, and emergency contact."
+          title="Contact & Personal"
+          description="Contact, emergency contact, and personal details."
+          items={[
+            ["Mobile No", employee.phone],
+            ["Email", employee.email],
+            ["Emergency Contact Name", employee.emergency_contact_name],
+            ["Emergency Contact No.", employee.emergency_contact_phone],
+            ["Date of Birth", formatDate(employee.date_of_birth)],
+            ["Gender", employee.gender],
+            ["Marital Status", employee.marital_status],
+            ["Nationality", employee.nationality],
+            ["Race", employee.race],
+            ["Religion", employee.religion],
+          ]}
+        />
+
+        <ProfileSection
+          title="Address"
+          description="Residential address details."
           items={[
             ["Address Line 1", employee.address_line_1],
             ["Address Line 2", employee.address_line_2],
             ["Address Line 3", employee.address_line_3],
             ["Postcode", employee.postcode],
             ["State", employee.state],
-            ["Email", employee.email],
-            ["Mobile No", employee.phone],
-            ["Emergency Contact Name", employee.emergency_contact_name],
-            ["Emergency Contact No.", employee.emergency_contact_phone],
           ]}
         />
 
-        <ProfileSection
-          title="Employment Information"
-          description="Department, branch, role, and joining details."
-          items={[
-            ["Business Unit", employee.business_unit],
-            ["Branch", employee.branch],
-            ["Division", employee.division],
-            ["Department", employee.department],
-            ["Designation", employee.designation],
-            ["Position", employee.position],
-            ["Staff Type", employee.staff_type],
-            ["Employment Status", employee.employment_status],
-            ["Joined Date", formatDate(employee.joined_date)],
-          ]}
-        />
+        <EmployeeDocuments employeeId={employee.id} />
       </div>
     </AppShell>
   );
@@ -209,7 +194,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
 
 function SummaryCard({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </p>

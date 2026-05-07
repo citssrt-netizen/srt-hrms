@@ -7,12 +7,18 @@ type EmployeeProfilePhotoProps = {
   employeeId: number;
   currentPhotoUrl?: string | null;
   employeeName: string;
+  staffNo?: string | null;
+  designation?: string | null;
+  showUpload?: boolean;
 };
 
 export function EmployeeProfilePhoto({
   employeeId,
   currentPhotoUrl,
   employeeName,
+  staffNo,
+  designation,
+  showUpload = false,
 }: EmployeeProfilePhotoProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -54,9 +60,7 @@ export function EmployeeProfilePhoto({
 
       const previewResponse = await fetch(
         `/api/employees/${employeeId}/photo/url`,
-        {
-          cache: "no-store",
-        }
+        { cache: "no-store" }
       );
 
       const previewResult = await previewResponse.json();
@@ -88,33 +92,40 @@ export function EmployeeProfilePhoto({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-5">
           {photoUrl ? (
             <img
               src={photoUrl}
               alt={employeeName}
-              className="h-24 w-24 rounded-2xl border border-slate-200 object-cover shadow-sm"
+              className="h-28 w-28 rounded-2xl border border-slate-200 object-cover shadow-sm"
             />
           ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-100 text-2xl font-bold text-slate-600 shadow-sm">
+            <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-3xl font-bold text-slate-600 shadow-sm">
               {initials}
             </div>
           )}
 
           <div>
-            <h3 className="text-base font-semibold text-slate-950">
-              Profile Photo
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Upload a professional employee profile photo.
+            <p className="text-sm font-medium text-slate-500">
+              {staffNo || "No staff number"}
             </p>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+              {employeeName}
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              {designation || "No designation"}
+            </p>
+          </div>
+        </div>
+
+        {showUpload ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
               <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
                 Choose Photo
-
                 <input
                   ref={inputRef}
                   type="file"
@@ -136,16 +147,16 @@ export function EmployeeProfilePhoto({
                 </span>
               )}
             </div>
-          </div>
-        </div>
 
-        <Button
-          type="button"
-          onClick={handleUpload}
-          disabled={isUploading || !selectedFile}
-        >
-          {isUploading ? "Uploading..." : "Upload Photo"}
-        </Button>
+            <Button
+              type="button"
+              onClick={handleUpload}
+              disabled={isUploading || !selectedFile}
+            >
+              {isUploading ? "Uploading..." : "Upload Photo"}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {message ? (

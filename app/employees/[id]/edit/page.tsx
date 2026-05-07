@@ -8,7 +8,11 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { EmployeeDocuments } from "../_components/EmployeeDocuments";
+import { EmployeeProfilePhoto } from "../_components/EmployeeProfilePhoto";
 import { EmployeeForm } from "../../_components/EmployeeForm";
+
+const PHOTO_BUCKET = "hr-employee-photos";
 
 type PageProps = {
   params: Promise<{
@@ -30,6 +34,22 @@ async function getEmployee(id: string) {
   return data;
 }
 
+async function getProfilePhotoUrl(profilePhotoPath: unknown) {
+  if (!profilePhotoPath) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrl(String(profilePhotoPath), 60 * 60);
+
+  if (error || !data?.signedUrl) {
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 export default async function EditEmployeePage({ params }: PageProps) {
   const { id } = await params;
   const employee = await getEmployee(id);
@@ -37,6 +57,8 @@ export default async function EditEmployeePage({ params }: PageProps) {
   if (!employee) {
     notFound();
   }
+
+  const profilePhotoUrl = await getProfilePhotoUrl(employee.profile_photo_path);
 
   return (
     <AppShell title="Edit Employee">
@@ -47,6 +69,15 @@ export default async function EditEmployeePage({ params }: PageProps) {
         >
           ← Back to Employee Profile
         </Link>
+
+        <EmployeeProfilePhoto
+          employeeId={employee.id}
+          employeeName={employee.full_name}
+          staffNo={employee.staff_no}
+          designation={employee.designation || employee.position}
+          currentPhotoUrl={profilePhotoUrl}
+          showUpload
+        />
 
         <Card>
           <CardHeader>
@@ -62,6 +93,8 @@ export default async function EditEmployeePage({ params }: PageProps) {
             initialData={employee}
           />
         </Card>
+
+        <EmployeeDocuments employeeId={employee.id} showUpload />
       </div>
     </AppShell>
   );
