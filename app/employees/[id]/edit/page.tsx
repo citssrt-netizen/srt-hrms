@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -7,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { EmployeeForm } from "../../_components/EmployeeForm";
 
 type PageProps = {
   params: Promise<{
@@ -38,18 +40,29 @@ export default async function EditEmployeePage({ params }: PageProps) {
 
   return (
     <AppShell title="Edit Employee">
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit Employee</CardTitle>
-          <CardDescription>
-            Update employee profile and HR information.
-          </CardDescription>
-        </CardHeader>
+      <div className="space-y-6">
+        <Link
+          href={`/employees/${employee.id}`}
+          className="text-sm font-medium text-slate-600 hover:text-slate-950"
+        >
+          ← Back to Employee Profile
+        </Link>
 
-        <pre className="rounded-xl bg-slate-950 p-4 text-sm text-white">
-          {JSON.stringify(employee, null, 2)}
-        </pre>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit Employee</CardTitle>
+            <CardDescription>
+              Update employee profile and HR information.
+            </CardDescription>
+          </CardHeader>
+
+          <EmployeeForm
+            mode="edit"
+            employeeId={employee.id}
+            initialData={employee}
+          />
+        </Card>
+      </div>
     </AppShell>
   );
 }

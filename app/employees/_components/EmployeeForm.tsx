@@ -6,7 +6,17 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 
-export function EmployeeForm() {
+type EmployeeFormProps = {
+  mode?: "create" | "edit";
+  employeeId?: number;
+  initialData?: Record<string, any>;
+};
+
+export function EmployeeForm({
+  mode = "create",
+  employeeId,
+  initialData = {},
+}: EmployeeFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -16,19 +26,21 @@ export function EmployeeForm() {
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
 
     setIsSubmitting(true);
     setMessage("");
 
-    const payload = Object.fromEntries(formData.entries());
-
-    const res = await fetch("/api/employees", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      mode === "edit" ? `/api/employees/${employeeId}` : "/api/employees",
+      {
+        method: mode === "edit" ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     const data = await res.json();
 
@@ -38,147 +50,150 @@ export function EmployeeForm() {
       return;
     }
 
-    form.reset();
-    setMessage("Employee saved successfully.");
     setIsSubmitting(false);
+
+    if (mode === "create") {
+      form.reset();
+      setMessage("Employee saved successfully.");
+      router.refresh();
+      return;
+    }
+
+    setMessage("Employee updated successfully.");
+    router.push(`/employees/${employeeId}`);
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <section className="space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-950">
-            General Information
-          </h3>
-          <p className="text-sm text-slate-500">
-            Basic employee identity and profile details.
-          </p>
-        </div>
+        <SectionTitle
+          title="General Information"
+          description="Basic employee identity and profile details."
+        />
 
         <div className="grid gap-5 md:grid-cols-3">
-          <Field name="staff_no" label="Staff No" placeholder="e.g. SRT001" />
+          <Field name="staff_no" label="Staff No" initialData={initialData} />
           <Field
             name="employment_type"
             label="Employment Type"
-            placeholder="e.g. Permanent"
+            initialData={initialData}
           />
           <Field
             name="full_name"
             label="Full Name"
-            placeholder="Enter full name"
             required
+            initialData={initialData}
           />
-          <Field name="date_of_birth" label="Date of Birth" type="date" />
-          <Field name="gender" label="Gender" placeholder="e.g. Female" />
+          <Field
+            name="date_of_birth"
+            label="Date of Birth"
+            type="date"
+            initialData={initialData}
+          />
+          <Field name="gender" label="Gender" initialData={initialData} />
           <Field
             name="marital_status"
             label="Marital Status"
-            placeholder="e.g. Married"
+            initialData={initialData}
           />
-          <Field name="ic_number" label="IC No" placeholder="e.g. 900101..." />
-          <Field name="race" label="Race" placeholder="e.g. Malay" />
-          <Field name="religion" label="Religion" placeholder="e.g. Muslim" />
+          <Field name="ic_number" label="IC No" initialData={initialData} />
+          <Field name="race" label="Race" initialData={initialData} />
+          <Field name="religion" label="Religion" initialData={initialData} />
           <Field
             name="nationality"
             label="Nationality"
-            placeholder="e.g. Malaysian"
+            initialData={initialData}
           />
         </div>
       </section>
 
       <section className="space-y-4 border-t border-slate-200 pt-6">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-950">
-            Contact Information
-          </h3>
-          <p className="text-sm text-slate-500">
-            Address, contact details, and emergency contact.
-          </p>
-        </div>
+        <SectionTitle
+          title="Contact Information"
+          description="Address, contact details, and emergency contact."
+        />
 
         <div className="grid gap-5 md:grid-cols-3">
           <Field
             name="address_line_1"
             label="Address Line 1"
-            placeholder="Address line 1"
+            initialData={initialData}
           />
           <Field
             name="address_line_2"
             label="Address Line 2"
-            placeholder="Address line 2"
+            initialData={initialData}
           />
           <Field
             name="address_line_3"
             label="Address Line 3"
-            placeholder="Address line 3"
+            initialData={initialData}
           />
-          <Field name="postcode" label="Postcode" placeholder="e.g. 44000" />
-          <Field name="state" label="State" placeholder="e.g. Selangor" />
-          <Field name="email" label="Email" type="email" placeholder="Email" />
-          <Field name="phone" label="Mobile No" placeholder="e.g. 012..." />
+          <Field name="postcode" label="Postcode" initialData={initialData} />
+          <Field name="state" label="State" initialData={initialData} />
+          <Field
+            name="email"
+            label="Email"
+            type="email"
+            initialData={initialData}
+          />
+          <Field name="phone" label="Mobile No" initialData={initialData} />
           <Field
             name="emergency_contact_name"
             label="Emergency Contact Name"
-            placeholder="Emergency contact name"
+            initialData={initialData}
           />
           <Field
             name="emergency_contact_phone"
             label="Emergency Contact No."
-            placeholder="Emergency contact number"
+            initialData={initialData}
           />
         </div>
       </section>
 
       <section className="space-y-4 border-t border-slate-200 pt-6">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-950">
-            Employment Information
-          </h3>
-          <p className="text-sm text-slate-500">
-            Job assignment, department, branch, and employment status.
-          </p>
-        </div>
+        <SectionTitle
+          title="Employment Information"
+          description="Job assignment, department, branch, and employment status."
+        />
 
         <div className="grid gap-5 md:grid-cols-3">
           <Field
             name="business_unit"
             label="Business Unit"
-            placeholder="e.g. West Malaysia"
+            initialData={initialData}
           />
-          <Field name="branch" label="Branch" placeholder="e.g. Central Hub" />
-          <Field
-            name="division"
-            label="Division"
-            placeholder="e.g. Operation Division"
-          />
+          <Field name="branch" label="Branch" initialData={initialData} />
+          <Field name="division" label="Division" initialData={initialData} />
           <Field
             name="department"
             label="Department"
-            placeholder="e.g. Cash In Transit"
+            initialData={initialData}
           />
           <Field
             name="designation"
             label="Designation"
-            placeholder="e.g. Security Officer"
+            initialData={initialData}
           />
-          <Field
-            name="position"
-            label="Position"
-            placeholder="e.g. HR Assistant"
-          />
+          <Field name="position" label="Position" initialData={initialData} />
           <Field
             name="staff_type"
             label="Staff Type"
-            placeholder="e.g. CIT"
+            initialData={initialData}
           />
           <Field
             name="employment_status"
             label="Employment Status"
-            placeholder="e.g. Active"
             defaultValue="Active"
+            initialData={initialData}
           />
-          <Field name="joined_date" label="Joined Date" type="date" />
+          <Field
+            name="joined_date"
+            label="Joined Date"
+            type="date"
+            initialData={initialData}
+          />
         </div>
       </section>
 
@@ -190,10 +205,29 @@ export function EmployeeForm() {
 
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Save Employee"}
+          {isSubmitting
+            ? "Saving..."
+            : mode === "edit"
+              ? "Update Employee"
+              : "Save Employee"}
         </Button>
       </div>
     </form>
+  );
+}
+
+function SectionTitle({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="text-sm text-slate-500">{description}</p>
+    </div>
   );
 }
 
@@ -201,18 +235,18 @@ type FieldProps = {
   name: string;
   label: string;
   type?: string;
-  placeholder?: string;
   defaultValue?: string;
   required?: boolean;
+  initialData: Record<string, any>;
 };
 
 function Field({
   name,
   label,
   type = "text",
-  placeholder,
-  defaultValue,
+  defaultValue = "",
   required = false,
+  initialData,
 }: FieldProps) {
   return (
     <div className="grid gap-2">
@@ -221,8 +255,7 @@ function Field({
         id={name}
         name={name}
         type={type}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
+        defaultValue={initialData[name] ?? defaultValue}
         required={required}
       />
     </div>
