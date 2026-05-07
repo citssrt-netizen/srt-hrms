@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { EmployeeDirectory } from "./_components/EmployeeDirectory";
 import { EmployeeForm } from "./_components/EmployeeForm";
 
@@ -20,16 +21,18 @@ type Employee = {
 };
 
 async function getEmployees(): Promise<Employee[]> {
-  const res = await fetch("http://localhost:3000/api/employees", {
-    cache: "no-store",
-  });
+  const { data, error } = await supabaseAdmin
+    .from("hr_employees")
+    .select(
+      "id, staff_no, full_name, ic_number, department, designation, employment_status"
+    )
+    .order("created_at", { ascending: false });
 
-  if (!res.ok) {
+  if (error) {
     return [];
   }
 
-  const data = await res.json();
-  return data.employees ?? [];
+  return data ?? [];
 }
 
 export default async function EmployeesPage() {

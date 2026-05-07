@@ -30,6 +30,32 @@ async function getEmployee(id: string) {
   return data;
 }
 
+function formatDate(value: unknown) {
+  if (!value) return "-";
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getStatusBadge(status: unknown) {
+  const value = String(status || "Active").toLowerCase();
+
+  if (value === "active") return "bg-emerald-50 text-emerald-700";
+  if (value === "resigned") return "bg-slate-100 text-slate-700";
+  if (value === "suspended") return "bg-red-50 text-red-700";
+
+  return "bg-amber-50 text-amber-700";
+}
+
 export default async function EmployeeDetailPage({ params }: PageProps) {
   const { id } = await params;
   const employee = await getEmployee(id);
@@ -55,7 +81,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
             <div>
               <p className="text-sm font-medium text-slate-500">
                 {employee.staff_no || "No staff number"}
@@ -70,9 +96,22 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
               </p>
             </div>
 
-            <span className="inline-flex w-fit rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <span
+              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
+                employee.employment_status
+              )}`}
+            >
               {employee.employment_status || "Active"}
             </span>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <SummaryCard label="Department" value={employee.department} />
+            <SummaryCard label="Branch" value={employee.branch} />
+            <SummaryCard
+              label="Joined Date"
+              value={formatDate(employee.joined_date)}
+            />
           </div>
         </div>
 
@@ -83,7 +122,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
             ["Staff No", employee.staff_no],
             ["Employment Type", employee.employment_type],
             ["Full Name", employee.full_name],
-            ["Date of Birth", employee.date_of_birth],
+            ["Date of Birth", formatDate(employee.date_of_birth)],
             ["Gender", employee.gender],
             ["Marital Status", employee.marital_status],
             ["IC No", employee.ic_number],
@@ -120,11 +159,25 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
             ["Designation", employee.designation],
             ["Position", employee.position],
             ["Staff Type", employee.staff_type],
-            ["Joined Date", employee.joined_date],
+            ["Employment Status", employee.employment_status],
+            ["Joined Date", formatDate(employee.joined_date)],
           ]}
         />
       </div>
     </AppShell>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-slate-950">
+        {String(value || "-")}
+      </p>
+    </div>
   );
 }
 
@@ -134,11 +187,7 @@ type ProfileSectionProps = {
   items: [string, unknown][];
 };
 
-function ProfileSection({
-  title,
-  description,
-  items,
-}: ProfileSectionProps) {
+function ProfileSection({ title, description, items }: ProfileSectionProps) {
   return (
     <Card>
       <CardHeader>
