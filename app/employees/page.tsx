@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import {
@@ -7,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
+import { EmployeeDirectory } from "./_components/EmployeeDirectory";
 import { EmployeeForm } from "./_components/EmployeeForm";
 
 type Employee = {
@@ -66,92 +66,11 @@ export default async function EmployeesPage() {
           <CardHeader>
             <CardTitle>Employee Directory</CardTitle>
             <CardDescription>
-              Click an employee row to view the full HR profile.
+              Search, filter, and open employee HR profiles.
             </CardDescription>
           </CardHeader>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Staff No</th>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">IC No</th>
-                  <th className="px-4 py-3 font-medium">Department</th>
-                  <th className="px-4 py-3 font-medium">Designation</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {employees.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-12 text-center text-slate-500"
-                    >
-                      No employees found yet.
-                    </td>
-                  </tr>
-                ) : (
-                  employees.map((employee) => (
-                    <tr key={employee.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-600">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          {employee.staff_no || "-"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-950">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          {employee.full_name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          {employee.ic_number || "-"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          {employee.department || "-"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          {employee.designation || "-"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="block"
-                        >
-                          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                            {employee.employment_status}
-                          </span>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <EmployeeDirectory employees={employees} />
         </Card>
       </div>
     </AppShell>
