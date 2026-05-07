@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import {
@@ -9,10 +10,12 @@ import {
 import { EmployeeForm } from "./_components/EmployeeForm";
 
 type Employee = {
-  id: string;
+  id: number;
+  staff_no: string | null;
   full_name: string;
-  position: string | null;
+  ic_number: string | null;
   department: string | null;
+  designation: string | null;
   employment_status: string;
 };
 
@@ -63,7 +66,7 @@ export default async function EmployeesPage() {
           <CardHeader>
             <CardTitle>Employee Directory</CardTitle>
             <CardDescription>
-              Current employee records from the HRMS database.
+              Click an employee row to view the full HR profile.
             </CardDescription>
           </CardHeader>
 
@@ -71,9 +74,11 @@ export default async function EmployeesPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <th className="px-4 py-3 font-medium">Staff No</th>
                   <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Position</th>
+                  <th className="px-4 py-3 font-medium">IC No</th>
                   <th className="px-4 py-3 font-medium">Department</th>
+                  <th className="px-4 py-3 font-medium">Designation</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -82,7 +87,7 @@ export default async function EmployeesPage() {
                 {employees.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={6}
                       className="px-4 py-12 text-center text-slate-500"
                     >
                       No employees found yet.
@@ -91,19 +96,55 @@ export default async function EmployeesPage() {
                 ) : (
                   employees.map((employee) => (
                     <tr key={employee.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-600">
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          {employee.staff_no || "-"}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 font-medium text-slate-950">
-                        {employee.full_name}
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          {employee.full_name}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        {employee.position || "-"}
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          {employee.ic_number || "-"}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        {employee.department || "-"}
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          {employee.department || "-"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          {employee.designation || "-"}
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                          {employee.employment_status}
-                        </span>
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="block"
+                        >
+                          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                            {employee.employment_status}
+                          </span>
+                        </Link>
                       </td>
                     </tr>
                   ))
