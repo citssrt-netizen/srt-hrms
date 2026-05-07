@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { EmployeeStatusActions } from "./_components/EmployeeStatusActions";
 
 type PageProps = {
   params: Promise<{
@@ -50,8 +51,11 @@ function getStatusBadge(status: unknown) {
   const value = String(status || "Active").toLowerCase();
 
   if (value === "active") return "bg-emerald-50 text-emerald-700";
+  if (value === "inactive") return "bg-slate-100 text-slate-700";
   if (value === "resigned") return "bg-slate-100 text-slate-700";
+  if (value === "terminated") return "bg-red-50 text-red-700";
   if (value === "suspended") return "bg-red-50 text-red-700";
+  if (value === "on leave") return "bg-amber-50 text-amber-700";
 
   return "bg-amber-50 text-amber-700";
 }
@@ -115,6 +119,11 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
           </div>
         </div>
 
+        <EmployeeStatusActions
+          employeeId={employee.id}
+          currentStatus={employee.employment_status}
+        />
+
         <ProfileSection
           title="General Information"
           description="Identity and personal details."
@@ -174,6 +183,7 @@ function SummaryCard({ label, value }: { label: string; value: unknown }) {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </p>
+
       <p className="mt-1 text-sm font-semibold text-slate-950">
         {String(value || "-")}
       </p>

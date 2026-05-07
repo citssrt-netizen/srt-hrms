@@ -7,14 +7,58 @@ type RouteProps = {
   }>;
 };
 
+const VALID_EMPLOYEE_STATUSES = [
+  "Active",
+  "Inactive",
+  "Resigned",
+  "Terminated",
+  "On Leave",
+];
+
 function cleanText(value: unknown) {
   const text = String(value ?? "").trim();
   return text || null;
 }
 
+function cleanEmployeeStatus(value: unknown) {
+  const status = String(value ?? "").trim();
+
+  if (!VALID_EMPLOYEE_STATUSES.includes(status)) {
+    return null;
+  }
+
+  return status;
+}
+
 export async function PATCH(request: Request, { params }: RouteProps) {
   const { id } = await params;
   const body = await request.json();
+
+  if (body.action === "update-status") {
+    const employmentStatus = cleanEmployeeStatus(body.employment_status);
+
+    if (!employmentStatus) {
+      return NextResponse.json(
+        { error: "Invalid employee status" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("hr_employees")
+      .update({
+        employment_status: employmentStatus,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ employee: data });
+  }
 
   const fullName = String(body.full_name ?? "").trim();
 
