@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/Card";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSession } from "@/lib/auth/session";
@@ -12,130 +12,219 @@ import { getCurrentSession } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const PHOTO_BUCKET = "hr-employee-photos";
+
 async function getEmployee(employeeId: number) {
-  const { data, error } = await supabaseAdmin
-    .from("hr_employees")
-    .select(
-      "id, staff_no, full_name, department, designation, employment_status, joined_date, email, phone"
-    )
-    .eq("id", employeeId)
-    .single();
+    const { data, error } = await supabaseAdmin
+        .from("hr_employees")
+        .select(
+            "id, staff_no, full_name, department, designation, employment_status, joined_date, profile_photo_path"
+        )
+        .eq("id", employeeId)
+        .single();
 
-  if (error || !data) {
-    return null;
-  }
+    if (error || !data) {
+        return null;
+    }
 
-  return data;
+    return data;
+}
+
+async function getProfilePhotoUrl(profilePhotoPath: unknown) {
+    if (!profilePhotoPath) {
+        return null;
+    }
+
+    const { data, error } = await supabaseAdmin.storage
+        .from(PHOTO_BUCKET)
+        .createSignedUrl(String(profilePhotoPath), 60 * 60);
+
+    if (error || !data?.signedUrl) {
+        return null;
+    }
+
+    return data.signedUrl;
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "-";
+    if (!value) return "-";
 
-  const date = new Date(value);
+    const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
 
-  return date.toLocaleDateString("en-MY", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+    return date.toLocaleDateString("en-MY", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
 }
 
 export default async function EmployeePortalPage() {
-  const session = await getCurrentSession();
+    const session = await getCurrentSession();
 
-  if (!session || session.role !== "employee" || !session.employeeId) {
-    redirect("/login");
-  }
+    if (!session || session.role !== "employee" || !session.employeeId) {
+        redirect("/login");
+    }
 
-  const employee = await getEmployee(session.employeeId);
+    const employee = await getEmployee(session.employeeId);
 
-  if (!employee) {
-    redirect("/login");
-  }
+    if (!employee) {
+        redirect("/login");
+    }
 
-  return (
-    <AppShell title="Employee Portal">
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">Welcome back,</p>
+    const profilePhotoUrl = await getProfilePhotoUrl(
+        employee.profile_photo_path
+    );
 
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-            {employee.full_name}
-          </h2>
+    const initials = String(employee.full_name || "")
+        .split(" ")
+        .map((word: string) => word.charAt(0))
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
 
-          <p className="mt-1 text-sm text-slate-500">
-            {employee.staff_no || "-"} · {employee.designation || "-"}
-          </p>
+    return (
+        <AppShell title="Employee Portal">
+            <div className="space-y-6">
+                <div className="rounded-2xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm">
+                    <div className="flex items-center gap-5">
+                        <div
+                            className="shrink-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-sm"
+                            style={{ width: 112, height: 112 }}
+                        >
+                            {profilePhotoUrl ? (
+                                <img
+                                    src={profilePhotoUrl}
+                                    alt={employee.full_name}
+                                    style={{
+                                        width: "112px",
+                                        height: "112px",
+                                        objectFit: "cover",
+                                        display: "block",
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xl font-bold text-white">
+                                    {initials}
+                                </div>
+                            )}
+                        </div>
 
-          <form action="/api/auth/logout" method="post" className="mt-5">
-            <button className="text-sm font-semibold text-slate-600 hover:text-slate-950">
-              Logout
-            </button>
-          </form>
-        </div>
+                        <div>
+                            <p className="text-sm font-medium text-slate-300">
+                                Welcome back,
+                            </p>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardDescription>Status</CardDescription>
-              <CardTitle>{employee.employment_status || "-"}</CardTitle>
-            </CardHeader>
-          </Card>
+                            <h2 className="mt-1 text-3xl font-bold tracking-tight">
+                                {employee.full_name}
+                            </h2>
 
-          <Card>
-            <CardHeader>
-              <CardDescription>Department</CardDescription>
-              <CardTitle>{employee.department || "-"}</CardTitle>
-            </CardHeader>
-          </Card>
+                            <p className="mt-2 text-sm text-slate-300">
+                                {employee.staff_no || "-"} ·{" "}
+                                {employee.designation || "-"} ·{" "}
+                                {employee.department || "-"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-          <Card>
-            <CardHeader>
-              <CardDescription>Joined Date</CardDescription>
-              <CardTitle>{formatDate(employee.joined_date)}</CardTitle>
-            </CardHeader>
-          </Card>
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                    <Card>
+                        <CardHeader>
+                            <CardDescription>Employment Status</CardDescription>
+                            <CardTitle>{employee.employment_status || "-"}</CardTitle>
+                        </CardHeader>
+                    </Card>
 
-          <Card>
-            <CardHeader>
-              <CardDescription>Self Service</CardDescription>
-              <CardTitle>Active</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardDescription>Department</CardDescription>
+                            <CardTitle>{employee.department || "-"}</CardTitle>
+                        </CardHeader>
+                    </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>My Profile</CardTitle>
-            <CardDescription>
-              View your HR profile and employment information.
-            </CardDescription>
-          </CardHeader>
+                    <Card>
+                        <CardHeader>
+                            <CardDescription>Joined Date</CardDescription>
+                            <CardTitle>{formatDate(employee.joined_date)}</CardTitle>
+                        </CardHeader>
+                    </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <InfoItem label="Email" value={employee.email} />
-            <InfoItem label="Phone" value={employee.phone} />
-            <InfoItem label="Department" value={employee.department} />
-            <InfoItem label="Designation" value={employee.designation} />
-          </div>
-        </Card>
-      </div>
-    </AppShell>
-  );
+                    <Card>
+                        <CardHeader>
+                            <CardDescription>Self-Service</CardDescription>
+                            <CardTitle>Active</CardTitle>
+                        </CardHeader>
+                    </Card>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <FeatureCard
+                        title="Leave"
+                        description="Apply for annual leave, medical leave, emergency leave, and view leave balances."
+                        status="Coming Soon"
+                    />
+
+                    <FeatureCard
+                        title="Attendance"
+                        description="View attendance records, clock-in history, lateness, and monthly summaries."
+                        status="Coming Soon"
+                    />
+
+                    <FeatureCard
+                        title="Payslips"
+                        description="View monthly payslips, salary details, deductions, and payroll documents."
+                        status="Coming Soon"
+                    />
+
+                    <FeatureCard
+                        title="Claims"
+                        description="Submit and track expense claims, mileage claims, and reimbursement requests."
+                        status="Coming Soon"
+                    />
+
+                    <FeatureCard
+                        title="Announcements"
+                        description="Read company notices, HR announcements, policy updates, and reminders."
+                        status="Coming Soon"
+                    />
+
+                    <FeatureCard
+                        title="Documents"
+                        description="Access HR letters, contracts, forms, and employee-related documents."
+                        status="Available in My Profile"
+                    />
+                </div>
+            </div>
+        </AppShell>
+    );
 }
 
-function InfoItem({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
+function FeatureCard({
+    title,
+    description,
+    status,
+}: {
+    title: string;
+    description: string;
+    status: string;
+}) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+            <div className="flex items-start justify-between gap-4">
+                <h3 className="text-lg font-bold text-slate-950">{title}</h3>
 
-      <p className="mt-1 text-sm font-medium text-slate-950">{value || "-"}</p>
-    </div>
-  );
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {status}
+                </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+                {description}
+            </p>
+        </div>
+    );
 }
