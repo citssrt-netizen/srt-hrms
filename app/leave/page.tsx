@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSession } from "@/lib/auth/session";
+import { LeaveApprovalActions } from "./_components/LeaveApprovalActions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -92,6 +93,8 @@ export default async function LeaveManagementPage() {
       .order("full_name", { ascending: true }),
   ]);
 
+  const typedLeaveRequests = (leaveRequests || []) as LeaveRequest[];
+
   const employeeMap = new Map(
     ((employees || []) as Employee[]).map((employee) => [
       employee.id,
@@ -119,28 +122,30 @@ export default async function LeaveManagementPage() {
           </h2>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Review employee leave requests. Approval and rejection actions will
-            be enabled in the next milestone after the submission flow is added.
+            Review employee leave requests, approve/reject applications, and
+            manage workforce leave planning.
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">
               Total Requests
             </p>
 
             <h3 className="mt-2 text-2xl font-bold text-slate-950">
-              {((leaveRequests || []) as LeaveRequest[]).length}
+              {typedLeaveRequests.length}
             </h3>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">Pending</p>
+            <p className="text-sm font-semibold text-slate-500">
+              Pending
+            </p>
 
-            <h3 className="mt-2 text-2xl font-bold text-slate-950">
+            <h3 className="mt-2 text-2xl font-bold text-amber-600">
               {
-                ((leaveRequests || []) as LeaveRequest[]).filter(
+                typedLeaveRequests.filter(
                   (request) => request.status === "pending"
                 ).length
               }
@@ -148,12 +153,28 @@ export default async function LeaveManagementPage() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">Approved</p>
+            <p className="text-sm font-semibold text-slate-500">
+              Approved
+            </p>
 
-            <h3 className="mt-2 text-2xl font-bold text-slate-950">
+            <h3 className="mt-2 text-2xl font-bold text-emerald-600">
               {
-                ((leaveRequests || []) as LeaveRequest[]).filter(
+                typedLeaveRequests.filter(
                   (request) => request.status === "approved"
+                ).length
+              }
+            </h3>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-semibold text-slate-500">
+              Rejected
+            </p>
+
+            <h3 className="mt-2 text-2xl font-bold text-red-600">
+              {
+                typedLeaveRequests.filter(
+                  (request) => request.status === "rejected"
                 ).length
               }
             </h3>
@@ -167,12 +188,12 @@ export default async function LeaveManagementPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Submitted employee leave requests will appear here.
+              Review and manage submitted leave requests.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[1280px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-semibold">Employee</th>
@@ -181,23 +202,24 @@ export default async function LeaveManagementPage() {
                   <th className="px-6 py-4 font-semibold">Start</th>
                   <th className="px-6 py-4 font-semibold">End</th>
                   <th className="px-6 py-4 font-semibold">Days</th>
+                  <th className="px-6 py-4 font-semibold">Reason</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Submitted</th>
+                  <th className="px-6 py-4 font-semibold">Actions</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {((leaveRequests || []) as LeaveRequest[]).length === 0 ? (
+                {typedLeaveRequests.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
                       No leave requests submitted yet.
                     </td>
                   </tr>
                 ) : (
-                  ((leaveRequests || []) as LeaveRequest[]).map((request) => {
+                  typedLeaveRequests.map((request) => {
                     const employee = employeeMap.get(request.employee_id);
                     const leaveType = leaveTypeMap.get(request.leave_type_id);
 
@@ -233,6 +255,10 @@ export default async function LeaveManagementPage() {
                           {request.total_days}
                         </td>
 
+                        <td className="px-6 py-4 text-slate-600">
+                          {request.reason || "-"}
+                        </td>
+
                         <td className="px-6 py-4">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
@@ -243,8 +269,11 @@ export default async function LeaveManagementPage() {
                           </span>
                         </td>
 
-                        <td className="px-6 py-4 text-slate-600">
-                          {formatDate(request.created_at)}
+                        <td className="px-6 py-4">
+                          <LeaveApprovalActions
+                            leaveRequestId={request.id}
+                            currentStatus={request.status}
+                          />
                         </td>
                       </tr>
                     );

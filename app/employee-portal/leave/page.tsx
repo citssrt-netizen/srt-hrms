@@ -58,6 +58,19 @@ function getStatusClassName(status: string) {
   return "bg-amber-50 text-amber-700";
 }
 
+function getLeaveUsage(
+  leaveTypeId: number,
+  leaveRequests: LeaveRequest[],
+  status: "approved" | "pending"
+) {
+  return leaveRequests
+    .filter(
+      (request) =>
+        request.leave_type_id === leaveTypeId && request.status === status
+    )
+    .reduce((total, request) => total + Number(request.total_days || 0), 0);
+}
+
 export default async function EmployeeLeavePage() {
   const session = await getCurrentSession();
 
@@ -101,9 +114,9 @@ export default async function EmployeeLeavePage() {
               </h2>
 
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                View your leave entitlement types, submit leave applications,
-                and track approval status. This module is being built with
-                Malaysian corporate HR workflows in mind.
+                View your leave entitlement, submit applications, and track
+                approval status. This module is being built with Malaysian
+                corporate HR workflows in mind.
               </p>
             </div>
           </div>
@@ -112,22 +125,76 @@ export default async function EmployeeLeavePage() {
         <LeaveApplicationForm leaveTypes={typedLeaveTypes} />
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {typedLeaveTypes.map((leaveType) => (
-            <div
-              key={leaveType.id}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <p className="text-sm font-semibold text-slate-500">
-                {leaveType.code}
-              </p>
+          {typedLeaveTypes.map((leaveType) => {
+            const approvedDays = getLeaveUsage(
+              leaveType.id,
+              typedLeaveRequests,
+              "approved"
+            );
 
-              <h3 className="mt-2 text-xl font-bold text-slate-950">
-                {leaveType.default_days} days
-              </h3>
+            const pendingDays = getLeaveUsage(
+              leaveType.id,
+              typedLeaveRequests,
+              "pending"
+            );
 
-              <p className="mt-2 text-sm text-slate-500">{leaveType.name}</p>
-            </div>
-          ))}
+            const balanceDays = Number(leaveType.default_days) - approvedDays;
+
+            return (
+              <div
+                key={leaveType.id}
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500">
+                      {leaveType.code}
+                    </p>
+
+                    <h3 className="mt-2 text-xl font-bold text-slate-950">
+                      {leaveType.name}
+                    </h3>
+                  </div>
+
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {leaveType.default_days} days
+                  </span>
+                </div>
+
+                <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Used
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-slate-950">
+                      {approvedDays}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-amber-700">
+                      Pending
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-amber-700">
+                      {pendingDays}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold text-emerald-700">
+                      Balance
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-emerald-700">
+                      {balanceDays}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -137,12 +204,13 @@ export default async function EmployeeLeavePage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Your submitted leave requests will appear here.
+              Your submitted leave requests and employer remarks will appear
+              here.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-semibold">Leave Type</th>
@@ -150,6 +218,7 @@ export default async function EmployeeLeavePage() {
                   <th className="px-6 py-4 font-semibold">End</th>
                   <th className="px-6 py-4 font-semibold">Days</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
+                  <th className="px-6 py-4 font-semibold">Employer Remark</th>
                   <th className="px-6 py-4 font-semibold">Submitted</th>
                 </tr>
               </thead>
@@ -158,7 +227,7 @@ export default async function EmployeeLeavePage() {
                 {typedLeaveRequests.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
                       No leave requests submitted yet.
@@ -194,6 +263,10 @@ export default async function EmployeeLeavePage() {
                           >
                             {request.status}
                           </span>
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-600">
+                          {request.employer_remark || "-"}
                         </td>
 
                         <td className="px-6 py-4 text-slate-600">
