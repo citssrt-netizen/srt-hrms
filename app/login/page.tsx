@@ -40,7 +40,8 @@ export default function LoginPage() {
         throw new Error(result.error || "Failed to login.");
       }
 
-      window.location.href = result.redirectTo || "/employee-portal";
+      window.location.href =
+        result.redirectTo || (role === "employer" ? "/dashboard" : "/employee-portal");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to login.");
     } finally {
@@ -77,7 +78,10 @@ export default function LoginPage() {
           <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => setRole("employee")}
+              onClick={() => {
+                setRole("employee");
+                setMessage("");
+              }}
               className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                 role === "employee"
                   ? "bg-white text-slate-950 shadow-sm"
@@ -89,7 +93,10 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => setRole("employer")}
+              onClick={() => {
+                setRole("employer");
+                setMessage("");
+              }}
               className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                 role === "employer"
                   ? "bg-white text-slate-950 shadow-sm"
@@ -109,7 +116,9 @@ export default function LoginPage() {
                 id="staff-no"
                 value={staffNo}
                 onChange={(event) => setStaffNo(event.target.value)}
-                placeholder={role === "employee" ? "Example: SRT001" : "Coming soon"}
+                placeholder={
+                  role === "employee" ? "Example: SRT001" : "Enter employer ID"
+                }
               />
             </div>
 
@@ -125,7 +134,7 @@ export default function LoginPage() {
                 placeholder={
                   role === "employee"
                     ? "Enter employee IC number"
-                    : "Coming soon"
+                    : "Enter employer password"
                 }
               />
             </div>
