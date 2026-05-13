@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -62,9 +61,7 @@ export default async function EmployeePortalPage() {
     <AppShell title="Employee Portal">
       <div className="space-y-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
-            Welcome back,
-          </p>
+          <p className="text-sm font-medium text-slate-500">Welcome back,</p>
 
           <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
             {employee.full_name}
@@ -125,15 +122,6 @@ export default async function EmployeePortalPage() {
             <InfoItem label="Department" value={employee.department} />
             <InfoItem label="Designation" value={employee.designation} />
           </div>
-
-          <div className="mt-5">
-            <Link
-              href={`/employees/${employee.id}`}
-              className="text-sm font-semibold text-slate-700 hover:text-slate-950"
-            >
-              View full HR profile →
-            </Link>
-          </div>
         </Card>
       </div>
     </AppShell>
@@ -147,9 +135,7 @@ function InfoItem({ label, value }: { label: string; value: string | null }) {
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-medium text-slate-950">
-        {value || "-"}
-      </p>
+      <p className="mt-1 text-sm font-medium text-slate-950">{value || "-"}</p>
     </div>
   );
 }
