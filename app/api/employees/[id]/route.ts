@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireApiAuth } from "@/lib/auth/requireAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteProps = {
@@ -31,6 +32,12 @@ function cleanEmployeeStatus(value: unknown) {
 }
 
 export async function PATCH(request: Request, { params }: RouteProps) {
+  const auth = await requireApiAuth(["employer"]);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { id } = await params;
   const body = await request.json();
 
