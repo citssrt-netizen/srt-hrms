@@ -13,27 +13,59 @@ const employerItems = [
     href: "/employees",
   },
   {
-    label: "Leave",
+    label: "Leave Management",
     href: "/leave",
+  },
+  {
+    label: "Attendance",
+    href: "/attendance",
   },
   {
     label: "Payroll",
     href: "/payroll",
   },
   {
+    label: "Claims",
+    href: "/claims",
+  },
+  {
     label: "Documents",
     href: "/documents",
+  },
+  {
+    label: "Settings",
+    href: "/settings",
   },
 ];
 
 const employeeItems = [
   {
-    label: "Employee Portal",
+    label: "Dashboard",
     href: "/employee-portal",
   },
   {
     label: "My Profile",
     href: "/employee-portal/profile",
+  },
+  {
+    label: "My Leave",
+    href: "/employee-portal/leave",
+  },
+  {
+    label: "My Attendance",
+    href: "/employee-portal/attendance",
+  },
+  {
+    label: "My Payroll",
+    href: "/employee-portal/payroll",
+  },
+  {
+    label: "My Claims",
+    href: "/employee-portal/claims",
+  },
+  {
+    label: "My Documents",
+    href: "/employee-portal/documents",
   },
 ];
 
@@ -57,17 +89,17 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 p-4">
         {items.map((item) => {
           const active =
-            pathname === item.href ||
-            pathname.startsWith(`${item.href}/`);
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${active
+              className={`flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${
+                active
                   ? "bg-white text-slate-950"
                   : "text-slate-300 hover:bg-slate-900 hover:text-white"
-                }`}
+              }`}
             >
               {item.label}
             </Link>
