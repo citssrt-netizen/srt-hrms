@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSession } from "@/lib/auth/session";
+import { LeaveApplicationForm } from "./_components/LeaveApplicationForm";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -78,11 +79,11 @@ export default async function EmployeeLeavePage() {
       .order("created_at", { ascending: false }),
   ]);
 
+  const typedLeaveTypes = (leaveTypes || []) as LeaveType[];
+  const typedLeaveRequests = (leaveRequests || []) as LeaveRequest[];
+
   const leaveTypeMap = new Map(
-    ((leaveTypes || []) as LeaveType[]).map((leaveType) => [
-      leaveType.id,
-      leaveType,
-    ])
+    typedLeaveTypes.map((leaveType) => [leaveType.id, leaveType])
   );
 
   return (
@@ -100,24 +101,18 @@ export default async function EmployeeLeavePage() {
               </h2>
 
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                View your leave entitlement types and track your submitted leave
-                requests. Leave application submission will be enabled in the
-                next milestone.
+                View your leave entitlement types, submit leave applications,
+                and track approval status. This module is being built with
+                Malaysian corporate HR workflows in mind.
               </p>
             </div>
-
-            <button
-              type="button"
-              disabled
-              className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-500"
-            >
-              Apply Leave Soon
-            </button>
           </div>
         </div>
 
+        <LeaveApplicationForm leaveTypes={typedLeaveTypes} />
+
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {((leaveTypes || []) as LeaveType[]).map((leaveType) => (
+          {typedLeaveTypes.map((leaveType) => (
             <div
               key={leaveType.id}
               className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -160,7 +155,7 @@ export default async function EmployeeLeavePage() {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {((leaveRequests || []) as LeaveRequest[]).length === 0 ? (
+                {typedLeaveRequests.length === 0 ? (
                   <tr>
                     <td
                       colSpan={6}
@@ -170,7 +165,7 @@ export default async function EmployeeLeavePage() {
                     </td>
                   </tr>
                 ) : (
-                  ((leaveRequests || []) as LeaveRequest[]).map((request) => {
+                  typedLeaveRequests.map((request) => {
                     const leaveType = leaveTypeMap.get(request.leave_type_id);
 
                     return (
