@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const items = [
+const employerItems = [
   {
     label: "Dashboard",
     href: "/dashboard",
@@ -26,15 +26,24 @@ const items = [
   },
 ];
 
+const employeeItems = [
+  {
+    label: "Employee Portal",
+    href: "/employee-portal",
+  },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
 
+  const isEmployeePortal = pathname.startsWith("/employee-portal");
+
+  const items = isEmployeePortal ? employeeItems : employerItems;
+
   return (
-    <aside className="hidden md:flex md:w-72 md:flex-col border-r border-slate-200 bg-slate-950 text-white">
+    <aside className="hidden border-r border-slate-200 bg-slate-950 text-white md:flex md:w-72 md:flex-col">
       <div className="border-b border-slate-800 px-6 py-5">
-        <h1 className="text-xl font-bold tracking-tight">
-          SRT HRMS
-        </h1>
+        <h1 className="text-xl font-bold tracking-tight">SRT HRMS</h1>
 
         <p className="mt-1 text-sm text-slate-400">
           Human Resource System
@@ -43,7 +52,9 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 p-4">
         {items.map((item) => {
-          const active = pathname === item.href;
+          const active =
+            pathname === item.href ||
+            pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
