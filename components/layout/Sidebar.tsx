@@ -31,6 +31,10 @@ const employeeItems = [
     label: "Employee Portal",
     href: "/employee-portal",
   },
+  {
+    label: "My Profile",
+    href: "/employee-portal/profile",
+  },
 ];
 
 export function Sidebar() {
@@ -60,11 +64,10 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${
-                active
+              className={`flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${active
                   ? "bg-white text-slate-950"
                   : "text-slate-300 hover:bg-slate-900 hover:text-white"
-              }`}
+                }`}
             >
               {item.label}
             </Link>
