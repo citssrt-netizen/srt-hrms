@@ -17,6 +17,10 @@ const employerItems = [
     href: "/leave",
   },
   {
+    label: "Public Holidays",
+    href: "/public-holidays",
+  },
+  {
     label: "Attendance",
     href: "/attendance",
   },

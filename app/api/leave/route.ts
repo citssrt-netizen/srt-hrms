@@ -10,7 +10,21 @@ function isValidDate(value: unknown) {
   return !Number.isNaN(date.getTime());
 }
 
-function calculateTotalDays(
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeDateKey(value: string | null) {
+  if (!value) return "";
+
+  return value.split("T")[0];
+}
+
+async function calculateTotalDays(
   startDateValue: string,
   endDateValue: string,
   isHalfDay: boolean
@@ -22,10 +36,105 @@ function calculateTotalDays(
   const startDate = new Date(`${startDateValue}T00:00:00`);
   const endDate = new Date(`${endDateValue}T00:00:00`);
 
-  const differenceMs = endDate.getTime() - startDate.getTime();
-  const differenceDays = Math.floor(differenceMs / 86400000) + 1;
+  let totalDays = 0;
 
-  return differenceDays;
+  const { data: publicHolidays, error: holidayError } = await supabaseAdmin
+    .from("hr_public_holidays")
+    .select("holiday_date")
+    .gte("holiday_date", startDateValue)
+    .lte("holiday_date", endDateValue);
+
+  if (holidayError) {
+    throw new Error("Failed to load public holidays.");
+  }
+
+  const holidaySet = new Set(
+    (publicHolidays || []).map((holiday) =>
+      normalizeDateKey(String(holiday.holiday_date || ""))
+    )
+  );
+
+  const currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getDay();
+    const formattedDate = formatDateKey(currentDate);
+
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isPublicHoliday = holidaySet.has(formattedDate);
+
+    if (!isWeekend && !isPublicHoliday) {
+      totalDays += 1;
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return totalDays;
+}
+
+function getLeaveYear(startDate: string) {
+  const date = new Date(`${startDate}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().getFullYear();
+  }
+
+  return date.getFullYear();
+}
+
+async function getApprovedLeaveUsage(
+  employeeId: number,
+  leaveTypeId: number,
+  year: number
+) {
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+
+  const { data, error } = await supabaseAdmin
+    .from("hr_leave_requests")
+    .select("total_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("status", "approved")
+    .gte("start_date", yearStart)
+    .lte("start_date", yearEnd);
+
+  if (error) {
+    throw new Error("Failed to calculate approved leave usage.");
+  }
+
+  return (data || []).reduce(
+    (total, request) => total + Number(request.total_days || 0),
+    0
+  );
+}
+
+async function getAvailableEntitlementDays(
+  employeeId: number,
+  leaveTypeId: number,
+  year: number,
+  defaultDays: number
+) {
+  const { data: balanceRecord, error: balanceError } = await supabaseAdmin
+    .from("hr_employee_leave_balances")
+    .select("balance_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("year", year)
+    .maybeSingle();
+
+  if (balanceError) {
+    throw new Error("Failed to check leave balance.");
+  }
+
+  if (balanceRecord) {
+    return Number(balanceRecord.balance_days || 0);
+  }
+
+  const approvedDays = await getApprovedLeaveUsage(employeeId, leaveTypeId, year);
+
+  return Number(defaultDays || 0) - approvedDays;
 }
 
 export async function POST(request: Request) {
@@ -78,18 +187,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const totalDays = calculateTotalDays(startDate, endDate, isHalfDay);
+  let totalDays = 0;
+
+  try {
+    totalDays = await calculateTotalDays(startDate, endDate, isHalfDay);
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to calculate leave working days." },
+      { status: 500 }
+    );
+  }
 
   if (totalDays <= 0) {
     return NextResponse.json(
-      { error: "Leave duration must be more than 0 days." },
+      {
+        error:
+          "Leave duration must be more than 0 working days. Weekends and public holidays are excluded.",
+      },
       { status: 400 }
     );
   }
 
   const { data: leaveType, error: leaveTypeError } = await supabaseAdmin
     .from("hr_leave_types")
-    .select("id")
+    .select("id, default_days")
     .eq("id", leaveTypeId)
     .single();
 
@@ -126,6 +247,31 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
+    const leaveYear = getLeaveYear(startDate);
+
+    const availableDays = await getAvailableEntitlementDays(
+      session.employeeId,
+      leaveTypeId,
+      leaveYear,
+      Number(leaveType.default_days || 0)
+    );
+
+    if (totalDays > availableDays) {
+      return NextResponse.json(
+        {
+          error: `Insufficient leave balance. Available balance: ${availableDays} day(s).`,
+        },
+        { status: 400 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to validate leave entitlement." },
+      { status: 500 }
+    );
+  }
+
   const { data: leaveRequest, error } = await supabaseAdmin
     .from("hr_leave_requests")
     .insert({
@@ -147,6 +293,17 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+
+  await supabaseAdmin.from("hr_leave_audit_logs").insert({
+    leave_request_id: leaveRequest.id,
+    employee_id: session.employeeId,
+    action: "submitted",
+    old_status: null,
+    new_status: "pending",
+    remarks: reason || null,
+    performed_by_role: "employee",
+    performed_by_employee_id: session.employeeId,
+  });
 
   return NextResponse.json({ leaveRequest }, { status: 201 });
 }
