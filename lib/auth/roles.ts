@@ -1,7 +1,19 @@
-import type { AuthRole } from "@/lib/auth/session";
+import type { AuthRole } from "@/lib/auth/auth-shared";
 
 export const EMPLOYEE_PORTAL_ROUTES = ["/employee-portal"];
-export const EMPLOYER_ROUTES = ["/dashboard", "/employees", "/admin"];
+
+export const EMPLOYER_ROUTES = [
+  "/dashboard",
+  "/employees",
+  "/leave",
+  "/public-holidays",
+  "/attendance",
+  "/payroll",
+  "/claims",
+  "/documents",
+  "/settings",
+  "/admin",
+];
 
 export function isEmployeePortalRoute(pathname: string) {
   return EMPLOYEE_PORTAL_ROUTES.some(

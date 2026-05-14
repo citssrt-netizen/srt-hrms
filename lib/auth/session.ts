@@ -1,15 +1,10 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
-
-export type AuthRole = "employee" | "employer";
-
-export type AuthSession = {
-  role: AuthRole;
-  employeeId?: number;
-  createdAt: string;
-};
-
-const SESSION_COOKIE_NAME = "srt_hrms_session";
+import {
+  SESSION_COOKIE_NAME,
+  type AuthRole,
+  type AuthSession,
+} from "@/lib/auth/auth-shared";
 
 function getSessionSecret() {
   const secret =
@@ -82,3 +77,4 @@ export async function getCurrentSession() {
 }
 
 export { SESSION_COOKIE_NAME };
+export type { AuthRole, AuthSession };

@@ -1,4 +1,7 @@
-import { SESSION_COOKIE_NAME, type AuthSession } from "@/lib/auth/session";
+import {
+  SESSION_COOKIE_NAME,
+  type AuthSession,
+} from "@/lib/auth/auth-shared";
 
 function getSessionSecret() {
   const secret =
@@ -30,7 +33,10 @@ function base64UrlEncodeFromBuffer(buffer: ArrayBuffer) {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 async function signPayload(payload: string) {
@@ -44,7 +50,11 @@ async function signPayload(payload: string) {
     ["sign"]
   );
 
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(payload)
+  );
 
   return base64UrlEncodeFromBuffer(signature);
 }
