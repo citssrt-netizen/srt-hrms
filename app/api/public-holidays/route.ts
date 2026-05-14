@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/requireAuth";
+import { recalculateLeaveRequestsForHolidayDate } from "@/lib/leave/recalculateLeaveRequestsForHolidayDate";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 function isValidDate(value: unknown) {
@@ -72,6 +73,22 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json(
       { error: "Failed to create public holiday." },
+      { status: 500 }
+    );
+  }
+
+  try {
+    await recalculateLeaveRequestsForHolidayDate({
+      holidayDate,
+      action: "public_holiday_created",
+      holidayName: name,
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Public holiday was created, but affected leave requests could not be recalculated.",
+      },
       { status: 500 }
     );
   }
