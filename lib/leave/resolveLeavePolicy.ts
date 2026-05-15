@@ -44,7 +44,29 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function policyScopeMatches(policyValue: unknown, employeeValue: unknown) {
+function policyScopeIdMatches(
+  policyValue: unknown,
+  employeeValue: unknown
+) {
+  const policyId = policyValue === null || policyValue === undefined
+    ? null
+    : Number(policyValue);
+
+  const employeeId = employeeValue === null || employeeValue === undefined
+    ? null
+    : Number(employeeValue);
+
+  if (!policyId) {
+    return true;
+  }
+
+  return policyId === employeeId;
+}
+
+function policyScopeTextMatches(
+  policyValue: unknown,
+  employeeValue: unknown
+) {
   const policyText = normalizeText(policyValue);
   const employeeText = normalizeText(employeeValue);
 
@@ -53,6 +75,24 @@ function policyScopeMatches(policyValue: unknown, employeeValue: unknown) {
   }
 
   return policyText === employeeText;
+}
+
+function policyScopeMatches({
+  policyId,
+  employeeId,
+  policyText,
+  employeeText,
+}: {
+  policyId: unknown;
+  employeeId: unknown;
+  policyText: unknown;
+  employeeText: unknown;
+}) {
+  if (policyId !== null && policyId !== undefined && String(policyId) !== "") {
+    return policyScopeIdMatches(policyId, employeeId);
+  }
+
+  return policyScopeTextMatches(policyText, employeeText);
 }
 
 export async function resolveLeavePolicy({
@@ -76,11 +116,17 @@ export async function resolveLeavePolicy({
       `
       joined_date,
       employment_type,
+      employment_type_id,
       employment_status,
+      employment_status_id,
       branch,
+      branch_id,
       department,
+      department_id,
       business_unit,
-      staff_type
+      business_unit_id,
+      staff_type,
+      staff_type_id
     `
     )
     .eq("id", employeeId)
@@ -107,6 +153,7 @@ export async function resolveLeavePolicy({
 
   const matchedPolicy = (policies || []).find((policy) => {
     const minServiceMonths = Number(policy.min_service_months || 0);
+
     const maxServiceMonths =
       policy.max_service_months === null ||
       policy.max_service_months === undefined
@@ -114,16 +161,47 @@ export async function resolveLeavePolicy({
         : Number(policy.max_service_months);
 
     const minServiceMatches = serviceMonths >= minServiceMonths;
+
     const maxServiceMatches =
       maxServiceMonths === null || serviceMonths <= maxServiceMonths;
 
     return (
-      policyScopeMatches(policy.employment_type, employee.employment_type) &&
-      policyScopeMatches(policy.employment_status, employee.employment_status) &&
-      policyScopeMatches(policy.branch, employee.branch) &&
-      policyScopeMatches(policy.department, employee.department) &&
-      policyScopeMatches(policy.business_unit, employee.business_unit) &&
-      policyScopeMatches(policy.staff_type, employee.staff_type) &&
+      policyScopeMatches({
+        policyId: policy.employment_type_id,
+        employeeId: employee.employment_type_id,
+        policyText: policy.employment_type,
+        employeeText: employee.employment_type,
+      }) &&
+      policyScopeMatches({
+        policyId: policy.employment_status_id,
+        employeeId: employee.employment_status_id,
+        policyText: policy.employment_status,
+        employeeText: employee.employment_status,
+      }) &&
+      policyScopeMatches({
+        policyId: policy.branch_id,
+        employeeId: employee.branch_id,
+        policyText: policy.branch,
+        employeeText: employee.branch,
+      }) &&
+      policyScopeMatches({
+        policyId: policy.department_id,
+        employeeId: employee.department_id,
+        policyText: policy.department,
+        employeeText: employee.department,
+      }) &&
+      policyScopeMatches({
+        policyId: policy.business_unit_id,
+        employeeId: employee.business_unit_id,
+        policyText: policy.business_unit,
+        employeeText: employee.business_unit,
+      }) &&
+      policyScopeMatches({
+        policyId: policy.staff_type_id,
+        employeeId: employee.staff_type_id,
+        policyText: policy.staff_type,
+        employeeText: employee.staff_type,
+      }) &&
       minServiceMatches &&
       maxServiceMatches
     );

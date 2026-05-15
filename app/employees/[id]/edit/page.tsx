@@ -20,6 +20,12 @@ type PageProps = {
   }>;
 };
 
+type MasterDataItem = {
+  id: number;
+  category: string;
+  name: string;
+};
+
 async function getEmployee(id: string) {
   const { data, error } = await supabaseAdmin
     .from("hr_employees")
@@ -32,6 +38,23 @@ async function getEmployee(id: string) {
   }
 
   return data;
+}
+
+async function getMasterData(): Promise<MasterDataItem[]> {
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, category, name")
+    .eq("is_active", true)
+    .order("category", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load HR master data:", error);
+    throw new Error(`Failed to load HR master data: ${error.message}`);
+  }
+
+  return data ?? [];
 }
 
 async function getProfilePhotoUrl(profilePhotoPath: unknown) {
@@ -52,7 +75,11 @@ async function getProfilePhotoUrl(profilePhotoPath: unknown) {
 
 export default async function EditEmployeePage({ params }: PageProps) {
   const { id } = await params;
-  const employee = await getEmployee(id);
+
+  const [employee, masterData] = await Promise.all([
+    getEmployee(id),
+    getMasterData(),
+  ]);
 
   if (!employee) {
     notFound();
@@ -91,6 +118,7 @@ export default async function EditEmployeePage({ params }: PageProps) {
             mode="edit"
             employeeId={employee.id}
             initialData={employee}
+            masterData={masterData}
           />
         </Card>
 

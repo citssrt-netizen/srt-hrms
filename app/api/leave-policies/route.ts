@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/requireAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { recalculateEmployeeLeaveBalance } from "@/lib/leave/recalculateEmployeeLeaveBalance";
+
+const MASTER_DATA_FIELDS = {
+  employment_type_id: "employment_type",
+  employment_status_id: "employment_status",
+  branch_id: "branch",
+  department_id: "department",
+  business_unit_id: "business_unit",
+  staff_type_id: "staff_type",
+} as const;
+
+type MasterDataIdField = keyof typeof MASTER_DATA_FIELDS;
 
 function cleanText(value: unknown) {
   const text = String(value ?? "").trim();
@@ -37,10 +49,6 @@ function cleanExpiryMonth(value: unknown) {
   return number;
 }
 
-function normalizeText(value: unknown) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
 function rangesOverlap(
   firstMin: number,
   firstMax: number | null,
@@ -54,37 +62,85 @@ function rangesOverlap(
 }
 
 function scopeConflicts(
-  existingValue: string | null,
-  incomingValue: string | null
+  existingValue: number | null,
+  incomingValue: number | null
 ) {
-  const existing = normalizeText(existingValue);
-  const incoming = normalizeText(incomingValue);
-
-  if (!existing || !incoming) {
+  if (!existingValue || !incomingValue) {
     return true;
   }
 
-  return existing === incoming;
+  return existingValue === incomingValue;
+}
+
+async function resolveMasterDataText(
+  field: MasterDataIdField,
+  value: unknown
+) {
+  const id = cleanNumber(value);
+
+  if (!id) {
+    return {
+      id: null,
+      name: null,
+    };
+  }
+
+  const category = MASTER_DATA_FIELDS[field];
+
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, name")
+    .eq("id", id)
+    .eq("category", category)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Invalid master data value for ${category}.`);
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+  };
+}
+
+async function buildMasterDataPayload(body: Record<string, unknown>) {
+  const entries = await Promise.all(
+    Object.keys(MASTER_DATA_FIELDS).map(async (field) => {
+      const key = field as MasterDataIdField;
+      const textField = MASTER_DATA_FIELDS[key];
+
+      const resolved = await resolveMasterDataText(key, body[key]);
+
+      return [
+        [key, resolved.id],
+        [textField, resolved.name],
+      ];
+    })
+  );
+
+  return Object.fromEntries(entries.flat());
 }
 
 async function hasActivePolicyConflict({
   leaveTypeId,
-  employmentType,
-  employmentStatus,
-  branch,
-  department,
-  businessUnit,
-  staffType,
+  employmentTypeId,
+  employmentStatusId,
+  branchId,
+  departmentId,
+  businessUnitId,
+  staffTypeId,
   minServiceMonths,
   maxServiceMonths,
 }: {
   leaveTypeId: number;
-  employmentType: string | null;
-  employmentStatus: string | null;
-  branch: string | null;
-  department: string | null;
-  businessUnit: string | null;
-  staffType: string | null;
+  employmentTypeId: number | null;
+  employmentStatusId: number | null;
+  branchId: number | null;
+  departmentId: number | null;
+  businessUnitId: number | null;
+  staffTypeId: number | null;
   minServiceMonths: number;
   maxServiceMonths: number | null;
 }) {
@@ -116,12 +172,21 @@ async function hasActivePolicyConflict({
 
     return (
       overlappingServiceRange &&
-      scopeConflicts(policy.employment_type, employmentType) &&
-      scopeConflicts(policy.employment_status, employmentStatus) &&
-      scopeConflicts(policy.branch, branch) &&
-      scopeConflicts(policy.department, department) &&
-      scopeConflicts(policy.business_unit, businessUnit) &&
-      scopeConflicts(policy.staff_type, staffType)
+      scopeConflicts(
+        policy.employment_type_id,
+        employmentTypeId
+      ) &&
+      scopeConflicts(
+        policy.employment_status_id,
+        employmentStatusId
+      ) &&
+      scopeConflicts(policy.branch_id, branchId) &&
+      scopeConflicts(policy.department_id, departmentId) &&
+      scopeConflicts(
+        policy.business_unit_id,
+        businessUnitId
+      ) &&
+      scopeConflicts(policy.staff_type_id, staffTypeId)
     );
   });
 }
@@ -166,19 +231,20 @@ export async function POST(request: Request) {
   const leaveTypeId = cleanNumber(body.leave_type_id);
   const policyName = cleanText(body.policy_name);
 
-  const employmentType = cleanText(body.employment_type);
-  const employmentStatus = cleanText(body.employment_status);
-  const branch = cleanText(body.branch);
-  const department = cleanText(body.department);
-  const businessUnit = cleanText(body.business_unit);
-  const staffType = cleanText(body.staff_type);
+  const minServiceMonths =
+    cleanNumber(body.min_service_months) ?? 0;
 
-  const minServiceMonths = cleanNumber(body.min_service_months) ?? 0;
-  const maxServiceMonths = cleanNumber(body.max_service_months);
+  const maxServiceMonths = cleanNumber(
+    body.max_service_months
+  );
 
-  const entitlementDays = cleanNumber(body.entitlement_days);
+  const entitlementDays = cleanNumber(
+    body.entitlement_days
+  );
 
-  const allowCarryForward = cleanBoolean(body.allow_carry_forward);
+  const allowCarryForward = cleanBoolean(
+    body.allow_carry_forward
+  );
 
   const maxCarryForwardDays =
     cleanNumber(body.max_carry_forward_days) ?? 0;
@@ -224,7 +290,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (maxServiceMonths !== null && maxServiceMonths < minServiceMonths) {
+  if (
+    maxServiceMonths !== null &&
+    maxServiceMonths < minServiceMonths
+  ) {
     return NextResponse.json(
       {
         error:
@@ -236,27 +305,52 @@ export async function POST(request: Request) {
 
   if (
     carryForwardExpiryMonth !== null &&
-    (carryForwardExpiryMonth < 1 || carryForwardExpiryMonth > 12)
+    (carryForwardExpiryMonth < 1 ||
+      carryForwardExpiryMonth > 12)
   ) {
     return NextResponse.json(
-      { error: "Carry-forward expiry month must be between 1 and 12." },
+      {
+        error:
+          "Carry-forward expiry month must be between 1 and 12.",
+      },
+      { status: 400 }
+    );
+  }
+
+  let masterDataPayload;
+
+  try {
+    masterDataPayload = await buildMasterDataPayload(body);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid master data value.",
+      },
       { status: 400 }
     );
   }
 
   if (isActive) {
     try {
-      const conflictingPolicy = await hasActivePolicyConflict({
-        leaveTypeId,
-        employmentType,
-        employmentStatus,
-        branch,
-        department,
-        businessUnit,
-        staffType,
-        minServiceMonths,
-        maxServiceMonths,
-      });
+      const conflictingPolicy =
+        await hasActivePolicyConflict({
+          leaveTypeId,
+          employmentTypeId:
+            masterDataPayload.employment_type_id,
+          employmentStatusId:
+            masterDataPayload.employment_status_id,
+          branchId: masterDataPayload.branch_id,
+          departmentId: masterDataPayload.department_id,
+          businessUnitId:
+            masterDataPayload.business_unit_id,
+          staffTypeId:
+            masterDataPayload.staff_type_id,
+          minServiceMonths,
+          maxServiceMonths,
+        });
 
       if (conflictingPolicy) {
         return NextResponse.json(
@@ -269,7 +363,10 @@ export async function POST(request: Request) {
       }
     } catch {
       return NextResponse.json(
-        { error: "Failed to check policy conflicts." },
+        {
+          error:
+            "Failed to check policy conflicts.",
+        },
         { status: 500 }
       );
     }
@@ -281,27 +378,28 @@ export async function POST(request: Request) {
       leave_type_id: leaveTypeId,
       policy_name: policyName,
 
-      employment_type: employmentType,
-      employment_status: employmentStatus,
-      branch,
-      department,
-      business_unit: businessUnit,
-      staff_type: staffType,
+      ...masterDataPayload,
 
       min_service_months: minServiceMonths,
       max_service_months: maxServiceMonths,
 
       entitlement_days: entitlementDays,
 
-      allow_proration: cleanBoolean(body.allow_proration),
+      allow_proration: cleanBoolean(
+        body.allow_proration
+      ),
 
       allow_carry_forward: allowCarryForward,
 
-      max_carry_forward_days: maxCarryForwardDays,
+      max_carry_forward_days:
+        maxCarryForwardDays,
 
-      carry_forward_expiry_month: carryForwardExpiryMonth,
+      carry_forward_expiry_month:
+        carryForwardExpiryMonth,
 
-      requires_attachment: cleanBoolean(body.requires_attachment),
+      requires_attachment: cleanBoolean(
+        body.requires_attachment
+      ),
 
       is_active: isActive,
     })
@@ -309,8 +407,50 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ policy: data }, { status: 201 });
+  const currentYear = new Date().getFullYear();
+
+  try {
+    const { data: employees, error: employeesError } =
+      await supabaseAdmin
+        .from("hr_employees")
+        .select("id")
+        .eq("employment_status", "Active");
+
+    if (employeesError) {
+      throw employeesError;
+    }
+
+    for (const employee of employees || []) {
+      await recalculateEmployeeLeaveBalance({
+        employeeId: employee.id,
+        leaveTypeId,
+        year: currentYear,
+      });
+    }
+  } catch (recalculateError) {
+    console.error(
+      "Leave policy saved but balance recalculation failed:",
+      recalculateError
+    );
+
+    return NextResponse.json(
+      {
+        policy: data,
+        warning:
+          "Leave policy saved, but automatic balance recalculation failed. Please run manual recalculation.",
+      },
+      { status: 201 }
+    );
+  }
+
+  return NextResponse.json(
+    { policy: data },
+    { status: 201 }
+  );
 }

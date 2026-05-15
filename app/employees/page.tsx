@@ -23,6 +23,12 @@ type Employee = {
   employment_status: string;
 };
 
+type MasterDataItem = {
+  id: number;
+  category: string;
+  name: string;
+};
+
 async function getEmployees(): Promise<Employee[]> {
   const { data, error } = await supabaseAdmin
     .from("hr_employees")
@@ -39,8 +45,28 @@ async function getEmployees(): Promise<Employee[]> {
   return data ?? [];
 }
 
+async function getMasterData(): Promise<MasterDataItem[]> {
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, category, name")
+    .eq("is_active", true)
+    .order("category", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load HR master data:", error);
+    throw new Error(`Failed to load HR master data: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
 export default async function EmployeesPage() {
-  const employees = await getEmployees();
+  const [employees, masterData] = await Promise.all([
+    getEmployees(),
+    getMasterData(),
+  ]);
 
   return (
     <AppShell title="Employees">
@@ -66,7 +92,7 @@ export default async function EmployeesPage() {
             </CardDescription>
           </CardHeader>
 
-          <EmployeeForm />
+          <EmployeeForm masterData={masterData} />
         </Card>
 
         <Card>

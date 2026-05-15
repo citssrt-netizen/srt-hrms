@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSession } from "@/lib/auth/session";
+import { recalculateEmployeeLeaveBalance } from "@/lib/leave/recalculateEmployeeLeaveBalance";
 import { LeaveApplicationForm } from "./_components/LeaveApplicationForm";
 
 export const dynamic = "force-dynamic";
@@ -74,43 +75,53 @@ export default async function EmployeeLeavePage() {
     redirect("/login");
   }
 
+  const employeeId = session.employeeId;
+
   const currentYear = new Date().getFullYear();
 
-  const [
-    { data: leaveTypes },
-    { data: leaveRequests },
-    { data: leaveBalances },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("hr_leave_types")
-      .select("id, name, code, default_days")
-      .order("name", { ascending: true }),
-
-    supabaseAdmin
-      .from("hr_leave_requests")
-      .select(
-        "id, leave_type_id, start_date, end_date, total_days, reason, status, employer_remark, created_at"
-      )
-      .eq("employee_id", session.employeeId)
-      .order("created_at", { ascending: false }),
-
-    supabaseAdmin
-      .from("hr_employee_leave_balances")
-      .select(
-        `
-        leave_type_id,
-        entitlement_days,
-        carried_forward_days,
-        used_days,
-        pending_days,
-        balance_days
-      `
-      )
-      .eq("employee_id", session.employeeId)
-      .eq("year", currentYear),
-  ]);
+  const { data: leaveTypes } = await supabaseAdmin
+    .from("hr_leave_types")
+    .select("id, name, code, default_days")
+    .order("name", { ascending: true });
 
   const typedLeaveTypes = (leaveTypes || []) as LeaveType[];
+
+  await Promise.all(
+    typedLeaveTypes.map((leaveType) =>
+      recalculateEmployeeLeaveBalance({
+        employeeId,
+        leaveTypeId: leaveType.id,
+        year: currentYear,
+      })
+    )
+  );
+
+  const [{ data: leaveRequests }, { data: leaveBalances }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("hr_leave_requests")
+        .select(
+          "id, leave_type_id, start_date, end_date, total_days, reason, status, employer_remark, created_at"
+        )
+        .eq("employee_id", employeeId)
+        .order("created_at", { ascending: false }),
+
+      supabaseAdmin
+        .from("hr_employee_leave_balances")
+        .select(
+          `
+          leave_type_id,
+          entitlement_days,
+          carried_forward_days,
+          used_days,
+          pending_days,
+          balance_days
+        `
+        )
+        .eq("employee_id", employeeId)
+        .eq("year", currentYear),
+    ]);
+
   const typedLeaveRequests = (leaveRequests || []) as LeaveRequest[];
   const typedLeaveBalances = (leaveBalances || []) as LeaveBalance[];
 
@@ -119,10 +130,7 @@ export default async function EmployeeLeavePage() {
   );
 
   const leaveBalanceMap = new Map(
-    typedLeaveBalances.map((balance) => [
-      balance.leave_type_id,
-      balance,
-    ])
+    typedLeaveBalances.map((balance) => [balance.leave_type_id, balance])
   );
 
   return (
@@ -162,7 +170,17 @@ export default async function EmployeeLeavePage() {
 
             const usedDays = Number(leaveBalance?.used_days || 0);
 
-            const pendingDays = Number(leaveBalance?.pending_days || 0);
+            const pendingDays = typedLeaveRequests
+              .filter(
+                (request) =>
+                  request.leave_type_id === leaveType.id &&
+                  request.status === "pending"
+              )
+              .reduce(
+                (total, request) =>
+                  total + Number(request.total_days || 0),
+                0
+              );
 
             const balanceDays = Number(leaveBalance?.balance_days || 0);
 

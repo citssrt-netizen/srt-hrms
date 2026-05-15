@@ -8,27 +8,84 @@ type RouteProps = {
   }>;
 };
 
-const VALID_EMPLOYEE_STATUSES = [
-  "Active",
-  "Inactive",
-  "Resigned",
-  "Terminated",
-  "On Leave",
-];
+const MASTER_DATA_FIELDS = {
+  employment_type_id: "employment_type",
+  employment_status_id: "employment_status",
+  business_unit_id: "business_unit",
+  branch_id: "branch",
+  division_id: "division",
+  department_id: "department",
+  staff_type_id: "staff_type",
+  designation_id: "designation",
+} as const;
+
+type MasterDataIdField = keyof typeof MASTER_DATA_FIELDS;
 
 function cleanText(value: unknown) {
   const text = String(value ?? "").trim();
   return text || null;
 }
 
-function cleanEmployeeStatus(value: unknown) {
-  const status = String(value ?? "").trim();
+function cleanNumber(value: unknown) {
+  const text = String(value ?? "").trim();
 
-  if (!VALID_EMPLOYEE_STATUSES.includes(status)) {
-    return null;
+  if (!text) return null;
+
+  const number = Number(text);
+
+  if (!Number.isInteger(number) || number <= 0) return null;
+
+  return number;
+}
+
+async function resolveMasterDataText(
+  field: MasterDataIdField,
+  value: unknown
+) {
+  const id = cleanNumber(value);
+
+  if (!id) {
+    return {
+      id: null,
+      name: null,
+    };
   }
 
-  return status;
+  const category = MASTER_DATA_FIELDS[field];
+
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, name")
+    .eq("id", id)
+    .eq("category", category)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Invalid master data value for ${category}.`);
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+  };
+}
+
+async function buildMasterDataPayload(body: Record<string, unknown>) {
+  const entries = await Promise.all(
+    Object.keys(MASTER_DATA_FIELDS).map(async (field) => {
+      const key = field as MasterDataIdField;
+      const textField = MASTER_DATA_FIELDS[key];
+      const resolved = await resolveMasterDataText(key, body[key]);
+
+      return [
+        [key, resolved.id],
+        [textField, resolved.name],
+      ];
+    })
+  );
+
+  return Object.fromEntries(entries.flat());
 }
 
 export async function PATCH(request: Request, { params }: RouteProps) {
@@ -39,32 +96,59 @@ export async function PATCH(request: Request, { params }: RouteProps) {
   }
 
   const { id } = await params;
+  const employeeId = Number(id);
+
+  if (!employeeId) {
+    return NextResponse.json(
+      { error: "Invalid employee ID." },
+      { status: 400 }
+    );
+  }
+
   const body = await request.json();
 
   if (body.action === "update-status") {
-    const employmentStatus = cleanEmployeeStatus(body.employment_status);
+    const employmentStatusId = cleanNumber(body.employment_status_id);
 
-    if (!employmentStatus) {
+    if (!employmentStatusId) {
       return NextResponse.json(
-        { error: "Invalid employee status" },
+        { error: "Employment status is required." },
         { status: 400 }
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("hr_employees")
-      .update({
-        employment_status: employmentStatus,
-      })
-      .eq("id", id)
-      .select()
-      .single();
+    try {
+      const resolved = await resolveMasterDataText(
+        "employment_status_id",
+        employmentStatusId
+      );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const { data, error } = await supabaseAdmin
+        .from("hr_employees")
+        .update({
+          employment_status_id: resolved.id,
+          employment_status: resolved.name,
+        })
+        .eq("id", employeeId)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ employee: data });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Invalid employee status.",
+        },
+        { status: 400 }
+      );
     }
-
-    return NextResponse.json({ employee: data });
   }
 
   const fullName = String(body.full_name ?? "").trim();
@@ -76,11 +160,27 @@ export async function PATCH(request: Request, { params }: RouteProps) {
     );
   }
 
+  let masterDataPayload;
+
+  try {
+    masterDataPayload = await buildMasterDataPayload(body);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid employee master data value.",
+      },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await supabaseAdmin
     .from("hr_employees")
     .update({
       staff_no: cleanText(body.staff_no),
-      employment_type: cleanText(body.employment_type),
+      ...masterDataPayload,
       full_name: fullName,
       date_of_birth: cleanText(body.date_of_birth),
       gender: cleanText(body.gender),
@@ -101,20 +201,13 @@ export async function PATCH(request: Request, { params }: RouteProps) {
       emergency_contact_phone: cleanText(body.emergency_contact_phone),
       address: cleanText(body.address),
 
-      business_unit: cleanText(body.business_unit),
-      branch: cleanText(body.branch),
-      division: cleanText(body.division),
-      department: cleanText(body.department),
-      employment_status: cleanText(body.employment_status) ?? "Active",
-      designation: cleanText(body.designation),
       position: cleanText(body.position),
-      staff_type: cleanText(body.staff_type),
       joined_date: cleanText(body.joined_date),
       basic_salary: cleanText(body.basic_salary),
       bank_name: cleanText(body.bank_name),
       bank_account_no: cleanText(body.bank_account_no),
     })
-    .eq("id", id)
+    .eq("id", employeeId)
     .select()
     .single();
 

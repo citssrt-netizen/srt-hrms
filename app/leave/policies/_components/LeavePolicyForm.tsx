@@ -12,14 +12,28 @@ type LeaveType = {
   code: string | null;
 };
 
-type LeavePolicyFormProps = {
-  leaveTypes: LeaveType[];
+type MasterDataItem = {
+  id: number;
+  category: string;
+  name: string;
 };
 
-export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
+type LeavePolicyFormProps = {
+  leaveTypes: LeaveType[];
+  masterData: MasterDataItem[];
+};
+
+export function LeavePolicyForm({
+  leaveTypes,
+  masterData,
+}: LeavePolicyFormProps) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function optionsFor(category: string) {
+    return masterData.filter((item) => item.category === category);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,12 +102,42 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
         </div>
 
         <Field name="policy_name" label="Policy Name" required />
-        <Field name="employment_type" label="Employment Type" />
-        <Field name="employment_status" label="Employment Status" />
-        <Field name="branch" label="Branch" />
-        <Field name="department" label="Department" />
-        <Field name="business_unit" label="Business Unit" />
-        <Field name="staff_type" label="Staff Type" />
+
+        <SelectField
+          name="employment_type_id"
+          label="Employment Type Scope"
+          options={optionsFor("employment_type")}
+        />
+
+        <SelectField
+          name="employment_status_id"
+          label="Employment Status Scope"
+          options={optionsFor("employment_status")}
+        />
+
+        <SelectField
+          name="branch_id"
+          label="Branch Scope"
+          options={optionsFor("branch")}
+        />
+
+        <SelectField
+          name="department_id"
+          label="Department Scope"
+          options={optionsFor("department")}
+        />
+
+        <SelectField
+          name="business_unit_id"
+          label="Business Unit Scope"
+          options={optionsFor("business_unit")}
+        />
+
+        <SelectField
+          name="staff_type_id"
+          label="Staff Type Scope"
+          options={optionsFor("staff_type")}
+        />
 
         <Field
           name="min_service_months"
@@ -101,11 +145,13 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
           type="number"
           defaultValue="0"
         />
+
         <Field
           name="max_service_months"
           label="Max Service Months"
           type="number"
         />
+
         <Field
           name="entitlement_days"
           label="Entitlement Days"
@@ -113,6 +159,7 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
           step="0.5"
           required
         />
+
         <Field
           name="max_carry_forward_days"
           label="Max Carry Forward Days"
@@ -120,6 +167,7 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
           step="0.5"
           defaultValue="0"
         />
+
         <Field
           name="carry_forward_expiry_month"
           label="Carry Forward Expiry Month"
@@ -183,6 +231,37 @@ function Field({
         defaultValue={defaultValue}
         required={required}
       />
+    </div>
+  );
+}
+
+function SelectField({
+  name,
+  label,
+  options,
+}: {
+  name: string;
+  label: string;
+  options: MasterDataItem[];
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={name}>{label}</Label>
+
+      <select
+        id={name}
+        name={name}
+        defaultValue=""
+        className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm outline-none focus:border-slate-900"
+      >
+        <option value="">All {label.replace(" Scope", "")}</option>
+
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

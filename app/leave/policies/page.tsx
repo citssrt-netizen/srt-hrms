@@ -9,10 +9,30 @@ import { RecalculateLeaveBalancesButton } from "./_components/RecalculateLeaveBa
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type MasterDataItem = {
+  id: number;
+  category: string;
+  name: string;
+};
+
 async function getLeaveTypes() {
   const { data, error } = await supabaseAdmin
     .from("hr_leave_types")
     .select("id, name, code")
+    .order("name", { ascending: true });
+
+  if (error) return [];
+
+  return data || [];
+}
+
+async function getMasterData(): Promise<MasterDataItem[]> {
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, category, name")
+    .eq("is_active", true)
+    .order("category", { ascending: true })
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) return [];
@@ -45,9 +65,10 @@ function showScope(value: string | null | undefined) {
 }
 
 export default async function LeavePoliciesPage() {
-  const [leaveTypes, policies] = await Promise.all([
+  const [leaveTypes, policies, masterData] = await Promise.all([
     getLeaveTypes(),
     getLeavePolicies(),
+    getMasterData(),
   ]);
 
   return (
@@ -59,9 +80,11 @@ export default async function LeavePoliciesPage() {
               <p className="text-sm font-medium text-slate-500">
                 Leave Management
               </p>
+
               <h1 className="mt-2 text-2xl font-bold text-slate-950">
                 Leave Policy Settings
               </h1>
+
               <p className="mt-2 max-w-3xl text-sm text-slate-600">
                 Configure entitlement days, proration, carry-forward,
                 attachments, and employee-scope rules such as department,
@@ -81,13 +104,17 @@ export default async function LeavePoliciesPage() {
           </div>
         </div>
 
-        <LeavePolicyForm leaveTypes={leaveTypes} />
+        <LeavePolicyForm
+          leaveTypes={leaveTypes}
+          masterData={masterData}
+        />
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5">
             <h2 className="text-lg font-semibold text-slate-950">
               Existing Policies
             </h2>
+
             <p className="text-sm text-slate-500">
               Manage active and inactive leave policy rules. Blank scope fields
               mean the policy applies to all employees in that category.
@@ -116,6 +143,7 @@ export default async function LeavePoliciesPage() {
                     <th className="px-3 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {policies.map((policy: any) => (
                     <tr
@@ -124,6 +152,7 @@ export default async function LeavePoliciesPage() {
                     >
                       <td className="px-3 py-4 font-medium text-slate-950">
                         <div>{policy.policy_name}</div>
+
                         <div className="mt-1 text-xs font-normal text-slate-500">
                           ID: {policy.id}
                         </div>
@@ -131,13 +160,17 @@ export default async function LeavePoliciesPage() {
 
                       <td className="px-3 py-4 text-slate-600">
                         <div>{policy.hr_leave_types?.name || "-"}</div>
+
                         <div className="mt-1 text-xs text-slate-400">
                           {policy.hr_leave_types?.code || "-"}
                         </div>
                       </td>
 
                       <td className="px-3 py-4 text-slate-600">
-                        <div>Type: {showScope(policy.employment_type)}</div>
+                        <div>
+                          Type: {showScope(policy.employment_type)}
+                        </div>
+
                         <div className="mt-1">
                           Status: {showScope(policy.employment_status)}
                         </div>
@@ -145,12 +178,15 @@ export default async function LeavePoliciesPage() {
 
                       <td className="px-3 py-4 text-slate-600">
                         <div>Branch: {showScope(policy.branch)}</div>
+
                         <div className="mt-1">
                           Dept: {showScope(policy.department)}
                         </div>
+
                         <div className="mt-1">
                           BU: {showScope(policy.business_unit)}
                         </div>
+
                         <div className="mt-1">
                           Staff: {showScope(policy.staff_type)}
                         </div>
@@ -175,6 +211,7 @@ export default async function LeavePoliciesPage() {
                             <div>
                               Max: {policy.max_carry_forward_days || 0} day(s)
                             </div>
+
                             <div className="mt-1 text-xs text-slate-500">
                               Expiry month:{" "}
                               {policy.carry_forward_expiry_month || "None"}

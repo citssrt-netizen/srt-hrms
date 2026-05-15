@@ -2,9 +2,84 @@ import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/requireAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+const MASTER_DATA_FIELDS = {
+  employment_type_id: "employment_type",
+  employment_status_id: "employment_status",
+  business_unit_id: "business_unit",
+  branch_id: "branch",
+  division_id: "division",
+  department_id: "department",
+  staff_type_id: "staff_type",
+  designation_id: "designation",
+} as const;
+
+type MasterDataIdField = keyof typeof MASTER_DATA_FIELDS;
+
 function cleanText(value: unknown) {
   const text = String(value ?? "").trim();
   return text || null;
+}
+
+function cleanNumber(value: unknown) {
+  const text = String(value ?? "").trim();
+
+  if (!text) return null;
+
+  const number = Number(text);
+
+  if (!Number.isInteger(number) || number <= 0) return null;
+
+  return number;
+}
+
+async function resolveMasterDataText(
+  field: MasterDataIdField,
+  value: unknown
+) {
+  const id = cleanNumber(value);
+
+  if (!id) {
+    return {
+      id: null,
+      name: null,
+    };
+  }
+
+  const category = MASTER_DATA_FIELDS[field];
+
+  const { data, error } = await supabaseAdmin
+    .from("hr_master_data_items")
+    .select("id, name")
+    .eq("id", id)
+    .eq("category", category)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Invalid master data value for ${category}.`);
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+  };
+}
+
+async function buildMasterDataPayload(body: Record<string, unknown>) {
+  const entries = await Promise.all(
+    Object.keys(MASTER_DATA_FIELDS).map(async (field) => {
+      const key = field as MasterDataIdField;
+      const textField = MASTER_DATA_FIELDS[key];
+      const resolved = await resolveMasterDataText(key, body[key]);
+
+      return [
+        [key, resolved.id],
+        [textField, resolved.name],
+      ];
+    })
+  );
+
+  return Object.fromEntries(entries.flat());
 }
 
 export async function GET() {
@@ -34,7 +109,6 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-
   const fullName = String(body.full_name ?? "").trim();
 
   if (!fullName) {
@@ -44,11 +118,27 @@ export async function POST(request: Request) {
     );
   }
 
+  let masterDataPayload;
+
+  try {
+    masterDataPayload = await buildMasterDataPayload(body);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid employee master data value.",
+      },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await supabaseAdmin
     .from("hr_employees")
     .insert({
       staff_no: cleanText(body.staff_no),
-      employment_type: cleanText(body.employment_type),
+      ...masterDataPayload,
       full_name: fullName,
       date_of_birth: cleanText(body.date_of_birth),
       gender: cleanText(body.gender),
@@ -69,14 +159,7 @@ export async function POST(request: Request) {
       emergency_contact_phone: cleanText(body.emergency_contact_phone),
       address: cleanText(body.address),
 
-      business_unit: cleanText(body.business_unit),
-      branch: cleanText(body.branch),
-      division: cleanText(body.division),
-      department: cleanText(body.department),
-      employment_status: cleanText(body.employment_status) ?? "Active",
-      designation: cleanText(body.designation),
       position: cleanText(body.position),
-      staff_type: cleanText(body.staff_type),
       joined_date: cleanText(body.joined_date),
       basic_salary: cleanText(body.basic_salary),
       bank_name: cleanText(body.bank_name),
