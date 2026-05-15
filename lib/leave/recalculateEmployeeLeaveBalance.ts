@@ -1,3 +1,4 @@
+import { calculateCarryForward } from "@/lib/leave/calculateCarryForward";
 import { calculateProratedEntitlement } from "@/lib/leave/calculateProratedEntitlement";
 import { resolveLeavePolicy } from "@/lib/leave/resolveLeavePolicy";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -71,18 +72,6 @@ export async function recalculateEmployeeLeaveBalance({
     year,
   });
 
-  const { data: existingBalance, error: balanceError } = await supabaseAdmin
-    .from("hr_employee_leave_balances")
-    .select("carried_forward_days")
-    .eq("employee_id", employeeId)
-    .eq("leave_type_id", leaveTypeId)
-    .eq("year", year)
-    .maybeSingle();
-
-  if (balanceError) {
-    throw new Error("Failed to check employee leave balance.");
-  }
-
   const entitlementDays = calculateProratedEntitlement({
     defaultEntitlementDays: resolvedPolicy.resolvedEntitlementDays,
     joinedDate: employee.joined_date,
@@ -90,14 +79,14 @@ export async function recalculateEmployeeLeaveBalance({
     allowProration: resolvedPolicy.allowProration,
   });
 
-  const carriedForwardDays = resolvedPolicy.allowCarryForward
-    ? Number(existingBalance?.carried_forward_days || 0)
-    : 0;
-
-  const cappedCarriedForwardDays =
-    resolvedPolicy.maxCarryForwardDays > 0
-      ? Math.min(carriedForwardDays, resolvedPolicy.maxCarryForwardDays)
-      : carriedForwardDays;
+  const carriedForwardDays = await calculateCarryForward({
+    employeeId,
+    leaveTypeId,
+    year,
+    allowCarryForward: resolvedPolicy.allowCarryForward,
+    maxCarryForwardDays: resolvedPolicy.maxCarryForwardDays,
+    carryForwardExpiryMonth: resolvedPolicy.carryForwardExpiryMonth,
+  });
 
   const { usedDays, pendingDays } = await getLeaveUsageTotals(
     employeeId,
@@ -105,7 +94,7 @@ export async function recalculateEmployeeLeaveBalance({
     year
   );
 
-  const balanceDays = entitlementDays + cappedCarriedForwardDays - usedDays;
+  const balanceDays = entitlementDays + carriedForwardDays - usedDays;
 
   const { data: updatedBalance, error: upsertError } = await supabaseAdmin
     .from("hr_employee_leave_balances")
@@ -115,7 +104,7 @@ export async function recalculateEmployeeLeaveBalance({
         leave_type_id: leaveTypeId,
         year,
         entitlement_days: entitlementDays,
-        carried_forward_days: cappedCarriedForwardDays,
+        carried_forward_days: carriedForwardDays,
         used_days: usedDays,
         pending_days: pendingDays,
         balance_days: balanceDays,

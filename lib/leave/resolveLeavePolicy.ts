@@ -44,6 +44,17 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function policyScopeMatches(policyValue: unknown, employeeValue: unknown) {
+  const policyText = normalizeText(policyValue);
+  const employeeText = normalizeText(employeeValue);
+
+  if (!policyText) {
+    return true;
+  }
+
+  return policyText === employeeText;
+}
+
 export async function resolveLeavePolicy({
   employeeId,
   leaveTypeId,
@@ -61,7 +72,17 @@ export async function resolveLeavePolicy({
 
   const { data: employee, error: employeeError } = await supabaseAdmin
     .from("hr_employees")
-    .select("joined_date, employment_type, employment_status")
+    .select(
+      `
+      joined_date,
+      employment_type,
+      employment_status,
+      branch,
+      department,
+      business_unit,
+      staff_type
+    `
+    )
     .eq("id", employeeId)
     .single();
 
@@ -71,7 +92,6 @@ export async function resolveLeavePolicy({
 
   const defaultEntitlementDays = Number(leaveType.default_days || 0);
   const serviceMonths = getServiceMonths(employee.joined_date, year);
-  const employeeEmploymentType = normalizeText(employee.employment_type);
 
   const { data: policies, error: policyError } = await supabaseAdmin
     .from("hr_leave_policies")
@@ -86,7 +106,6 @@ export async function resolveLeavePolicy({
   }
 
   const matchedPolicy = (policies || []).find((policy) => {
-    const policyEmploymentType = normalizeText(policy.employment_type);
     const minServiceMonths = Number(policy.min_service_months || 0);
     const maxServiceMonths =
       policy.max_service_months === null ||
@@ -94,14 +113,20 @@ export async function resolveLeavePolicy({
         ? null
         : Number(policy.max_service_months);
 
-    const employmentTypeMatches =
-      !policyEmploymentType || policyEmploymentType === employeeEmploymentType;
-
     const minServiceMatches = serviceMonths >= minServiceMonths;
     const maxServiceMatches =
       maxServiceMonths === null || serviceMonths <= maxServiceMonths;
 
-    return employmentTypeMatches && minServiceMatches && maxServiceMatches;
+    return (
+      policyScopeMatches(policy.employment_type, employee.employment_type) &&
+      policyScopeMatches(policy.employment_status, employee.employment_status) &&
+      policyScopeMatches(policy.branch, employee.branch) &&
+      policyScopeMatches(policy.department, employee.department) &&
+      policyScopeMatches(policy.business_unit, employee.business_unit) &&
+      policyScopeMatches(policy.staff_type, employee.staff_type) &&
+      minServiceMatches &&
+      maxServiceMatches
+    );
   });
 
   if (!matchedPolicy) {
@@ -130,7 +155,8 @@ export async function resolveLeavePolicy({
     maxCarryForwardDays: Number(matchedPolicy.max_carry_forward_days || 0),
     carryForwardExpiryMonth:
       matchedPolicy.carry_forward_expiry_month === null ||
-      matchedPolicy.carry_forward_expiry_month === undefined
+      matchedPolicy.carry_forward_expiry_month === undefined ||
+      Number(matchedPolicy.carry_forward_expiry_month) === 0
         ? null
         : Number(matchedPolicy.carry_forward_expiry_month),
     requiresAttachment: Boolean(matchedPolicy.requires_attachment),

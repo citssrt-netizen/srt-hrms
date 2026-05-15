@@ -1,16 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/requireAuth";
 import { recalculateEmployeeLeaveBalance } from "@/lib/leave/recalculateEmployeeLeaveBalance";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const auth = await requireApiAuth(["employer"]);
 
   if (auth.response) {
     return auth.response;
   }
 
-  const year = new Date().getFullYear();
+  let requestedYear: number | null = null;
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    requestedYear = body.year ? Number(body.year) : null;
+  } catch {
+    requestedYear = null;
+  }
+
+  const year =
+    requestedYear && Number.isInteger(requestedYear)
+      ? requestedYear
+      : new Date().getFullYear();
 
   const { data: employees, error: employeesError } = await supabaseAdmin
     .from("hr_employees")

@@ -63,8 +63,8 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
           Add Leave Policy
         </h2>
         <p className="text-sm text-slate-500">
-          Create configurable HR leave rules for entitlement and future
-          calculations.
+          Create configurable HR leave rules. Blank scope fields mean the policy
+          applies to all employees in that category.
         </p>
       </div>
 
@@ -89,13 +89,23 @@ export function LeavePolicyForm({ leaveTypes }: LeavePolicyFormProps) {
 
         <Field name="policy_name" label="Policy Name" required />
         <Field name="employment_type" label="Employment Type" />
+        <Field name="employment_status" label="Employment Status" />
+        <Field name="branch" label="Branch" />
+        <Field name="department" label="Department" />
+        <Field name="business_unit" label="Business Unit" />
+        <Field name="staff_type" label="Staff Type" />
+
         <Field
           name="min_service_months"
           label="Min Service Months"
           type="number"
           defaultValue="0"
         />
-        <Field name="max_service_months" label="Max Service Months" type="number" />
+        <Field
+          name="max_service_months"
+          label="Max Service Months"
+          type="number"
+        />
         <Field
           name="entitlement_days"
           label="Entitlement Days"
