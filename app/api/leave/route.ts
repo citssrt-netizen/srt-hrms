@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/requireAuth";
+import { calculateLeaveWorkingDays } from "@/lib/leave/calculateLeaveWorkingDays";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 function isValidDate(value: unknown) {
@@ -8,69 +9,6 @@ function isValidDate(value: unknown) {
   const date = new Date(value);
 
   return !Number.isNaN(date.getTime());
-}
-
-function formatDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function normalizeDateKey(value: string | null) {
-  if (!value) return "";
-
-  return value.split("T")[0];
-}
-
-async function calculateTotalDays(
-  startDateValue: string,
-  endDateValue: string,
-  isHalfDay: boolean
-) {
-  if (isHalfDay) {
-    return 0.5;
-  }
-
-  const startDate = new Date(`${startDateValue}T00:00:00`);
-  const endDate = new Date(`${endDateValue}T00:00:00`);
-
-  let totalDays = 0;
-
-  const { data: publicHolidays, error: holidayError } = await supabaseAdmin
-    .from("hr_public_holidays")
-    .select("holiday_date")
-    .gte("holiday_date", startDateValue)
-    .lte("holiday_date", endDateValue);
-
-  if (holidayError) {
-    throw new Error("Failed to load public holidays.");
-  }
-
-  const holidaySet = new Set(
-    (publicHolidays || []).map((holiday) =>
-      normalizeDateKey(String(holiday.holiday_date || ""))
-    )
-  );
-
-  const currentDate = new Date(startDate);
-
-  while (currentDate <= endDate) {
-    const dayOfWeek = currentDate.getDay();
-    const formattedDate = formatDateKey(currentDate);
-
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isPublicHoliday = holidaySet.has(formattedDate);
-
-    if (!isWeekend && !isPublicHoliday) {
-      totalDays += 1;
-    }
-
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  return totalDays;
 }
 
 function getLeaveYear(startDate: string) {
@@ -190,7 +128,11 @@ export async function POST(request: Request) {
   let totalDays = 0;
 
   try {
-    totalDays = await calculateTotalDays(startDate, endDate, isHalfDay);
+    totalDays = await calculateLeaveWorkingDays({
+      startDateValue: startDate,
+      endDateValue: endDate,
+      isHalfDay,
+    });
   } catch {
     return NextResponse.json(
       { error: "Failed to calculate leave working days." },

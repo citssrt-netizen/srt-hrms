@@ -6,7 +6,7 @@ export default function HomePage() {
     <main className="flex min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-6 py-20 text-center">
         <div className="max-w-3xl">
-          <div className="mb-6 inline-flex items-center rounded-full border border-slate-800 bg-slate-900 px-4 py-1.5 text-sm text-slate-300">
+        <div className="mb-6 inline-flex items-center rounded-full border border-slate-800 bg-slate-900 px-4 py-1.5 text-sm text-slate-300">
             SRT Security Services
           </div>
 

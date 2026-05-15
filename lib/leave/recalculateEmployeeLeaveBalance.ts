@@ -1,3 +1,5 @@
+import { calculateProratedEntitlement } from "@/lib/leave/calculateProratedEntitlement";
+import { resolveLeavePolicy } from "@/lib/leave/resolveLeavePolicy";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RecalculateEmployeeLeaveBalanceParams = {
@@ -53,19 +55,25 @@ export async function recalculateEmployeeLeaveBalance({
   leaveTypeId,
   year,
 }: RecalculateEmployeeLeaveBalanceParams) {
-  const { data: leaveType, error: leaveTypeError } = await supabaseAdmin
-    .from("hr_leave_types")
-    .select("default_days")
-    .eq("id", leaveTypeId)
+  const { data: employee, error: employeeError } = await supabaseAdmin
+    .from("hr_employees")
+    .select("joined_date")
+    .eq("id", employeeId)
     .single();
 
-  if (leaveTypeError || !leaveType) {
-    throw new Error("Leave type not found.");
+  if (employeeError || !employee) {
+    throw new Error("Employee not found.");
   }
+
+  const resolvedPolicy = await resolveLeavePolicy({
+    employeeId,
+    leaveTypeId,
+    year,
+  });
 
   const { data: existingBalance, error: balanceError } = await supabaseAdmin
     .from("hr_employee_leave_balances")
-    .select("entitlement_days, carried_forward_days")
+    .select("carried_forward_days")
     .eq("employee_id", employeeId)
     .eq("leave_type_id", leaveTypeId)
     .eq("year", year)
@@ -75,15 +83,21 @@ export async function recalculateEmployeeLeaveBalance({
     throw new Error("Failed to check employee leave balance.");
   }
 
-  const entitlementDays =
-    existingBalance?.entitlement_days !== undefined &&
-    existingBalance?.entitlement_days !== null
-      ? Number(existingBalance.entitlement_days)
-      : Number(leaveType.default_days || 0);
+  const entitlementDays = calculateProratedEntitlement({
+    defaultEntitlementDays: resolvedPolicy.resolvedEntitlementDays,
+    joinedDate: employee.joined_date,
+    year,
+    allowProration: resolvedPolicy.allowProration,
+  });
 
-  const carriedForwardDays = Number(
-    existingBalance?.carried_forward_days || 0
-  );
+  const carriedForwardDays = resolvedPolicy.allowCarryForward
+    ? Number(existingBalance?.carried_forward_days || 0)
+    : 0;
+
+  const cappedCarriedForwardDays =
+    resolvedPolicy.maxCarryForwardDays > 0
+      ? Math.min(carriedForwardDays, resolvedPolicy.maxCarryForwardDays)
+      : carriedForwardDays;
 
   const { usedDays, pendingDays } = await getLeaveUsageTotals(
     employeeId,
@@ -91,7 +105,7 @@ export async function recalculateEmployeeLeaveBalance({
     year
   );
 
-  const balanceDays = entitlementDays + carriedForwardDays - usedDays;
+  const balanceDays = entitlementDays + cappedCarriedForwardDays - usedDays;
 
   const { data: updatedBalance, error: upsertError } = await supabaseAdmin
     .from("hr_employee_leave_balances")
@@ -101,7 +115,7 @@ export async function recalculateEmployeeLeaveBalance({
         leave_type_id: leaveTypeId,
         year,
         entitlement_days: entitlementDays,
-        carried_forward_days: carriedForwardDays,
+        carried_forward_days: cappedCarriedForwardDays,
         used_days: usedDays,
         pending_days: pendingDays,
         balance_days: balanceDays,

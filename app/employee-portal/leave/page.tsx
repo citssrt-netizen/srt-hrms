@@ -14,6 +14,15 @@ type LeaveType = {
   default_days: number;
 };
 
+type LeaveBalance = {
+  leave_type_id: number;
+  entitlement_days: number;
+  carried_forward_days: number;
+  used_days: number;
+  pending_days: number;
+  balance_days: number;
+};
+
 type LeaveRequest = {
   id: number;
   leave_type_id: number;
@@ -58,19 +67,6 @@ function getStatusClassName(status: string) {
   return "bg-amber-50 text-amber-700";
 }
 
-function getLeaveUsage(
-  leaveTypeId: number,
-  leaveRequests: LeaveRequest[],
-  status: "approved" | "pending"
-) {
-  return leaveRequests
-    .filter(
-      (request) =>
-        request.leave_type_id === leaveTypeId && request.status === status
-    )
-    .reduce((total, request) => total + Number(request.total_days || 0), 0);
-}
-
 export default async function EmployeeLeavePage() {
   const session = await getCurrentSession();
 
@@ -78,11 +74,18 @@ export default async function EmployeeLeavePage() {
     redirect("/login");
   }
 
-  const [{ data: leaveTypes }, { data: leaveRequests }] = await Promise.all([
+  const currentYear = new Date().getFullYear();
+
+  const [
+    { data: leaveTypes },
+    { data: leaveRequests },
+    { data: leaveBalances },
+  ] = await Promise.all([
     supabaseAdmin
       .from("hr_leave_types")
       .select("id, name, code, default_days")
       .order("name", { ascending: true }),
+
     supabaseAdmin
       .from("hr_leave_requests")
       .select(
@@ -90,13 +93,36 @@ export default async function EmployeeLeavePage() {
       )
       .eq("employee_id", session.employeeId)
       .order("created_at", { ascending: false }),
+
+    supabaseAdmin
+      .from("hr_employee_leave_balances")
+      .select(
+        `
+        leave_type_id,
+        entitlement_days,
+        carried_forward_days,
+        used_days,
+        pending_days,
+        balance_days
+      `
+      )
+      .eq("employee_id", session.employeeId)
+      .eq("year", currentYear),
   ]);
 
   const typedLeaveTypes = (leaveTypes || []) as LeaveType[];
   const typedLeaveRequests = (leaveRequests || []) as LeaveRequest[];
+  const typedLeaveBalances = (leaveBalances || []) as LeaveBalance[];
 
   const leaveTypeMap = new Map(
     typedLeaveTypes.map((leaveType) => [leaveType.id, leaveType])
+  );
+
+  const leaveBalanceMap = new Map(
+    typedLeaveBalances.map((balance) => [
+      balance.leave_type_id,
+      balance,
+    ])
   );
 
   return (
@@ -126,19 +152,19 @@ export default async function EmployeeLeavePage() {
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           {typedLeaveTypes.map((leaveType) => {
-            const approvedDays = getLeaveUsage(
-              leaveType.id,
-              typedLeaveRequests,
-              "approved"
+            const leaveBalance = leaveBalanceMap.get(leaveType.id);
+
+            const entitlementDays = Number(
+              leaveBalance?.entitlement_days ??
+                leaveType.default_days ??
+                0
             );
 
-            const pendingDays = getLeaveUsage(
-              leaveType.id,
-              typedLeaveRequests,
-              "pending"
-            );
+            const usedDays = Number(leaveBalance?.used_days || 0);
 
-            const balanceDays = Number(leaveType.default_days) - approvedDays;
+            const pendingDays = Number(leaveBalance?.pending_days || 0);
+
+            const balanceDays = Number(leaveBalance?.balance_days || 0);
 
             return (
               <div
@@ -157,7 +183,7 @@ export default async function EmployeeLeavePage() {
                   </div>
 
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {leaveType.default_days} days
+                    {entitlementDays} days
                   </span>
                 </div>
 
@@ -168,7 +194,7 @@ export default async function EmployeeLeavePage() {
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-slate-950">
-                      {approvedDays}
+                      {usedDays}
                     </p>
                   </div>
 
@@ -218,7 +244,9 @@ export default async function EmployeeLeavePage() {
                   <th className="px-6 py-4 font-semibold">End</th>
                   <th className="px-6 py-4 font-semibold">Days</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Employer Remark</th>
+                  <th className="px-6 py-4 font-semibold">
+                    Employer Remark
+                  </th>
                   <th className="px-6 py-4 font-semibold">Submitted</th>
                 </tr>
               </thead>
@@ -235,7 +263,9 @@ export default async function EmployeeLeavePage() {
                   </tr>
                 ) : (
                   typedLeaveRequests.map((request) => {
-                    const leaveType = leaveTypeMap.get(request.leave_type_id);
+                    const leaveType = leaveTypeMap.get(
+                      request.leave_type_id
+                    );
 
                     return (
                       <tr key={request.id}>
